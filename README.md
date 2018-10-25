@@ -42,7 +42,7 @@ possible experiment, without involving the complexities of DMTCP.
 * [x] Add a dlsym-like API in the lower half to figure out addresses of MPI API
 * [x] Test calling a MPI function (through lower-half's dlsym API) from the
        upper half
-* [ ] Add checkpoint-restart logic from mini-DMTCP assignment
+* [x] Add checkpoint-restart logic from mini-DMTCP assignment
 * [ ] Test full checkpoint-restart functionality
 
 ## Results

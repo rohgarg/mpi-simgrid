@@ -28,8 +28,7 @@
 
 #define NEXT_FUNC(func)                                                        \
   ({                                                                           \
-    static __typeof__(&MPI_##func)_real_MPI_## func =                          \
-                                                (__typeof__(&MPI_##func)) - 1; \
+    __typeof__(&MPI_##func)_real_MPI_## func = (__typeof__(&MPI_##func)) - 1;  \
     if (_real_MPI_ ## func == (__typeof__(&MPI_##func)) - 1) {                 \
       LhDlsym_t dlsymFptr = (LhDlsym_t)lhInfo.lhDlsym;                         \
       _real_MPI_ ## func = (__typeof__(&MPI_##func))dlsymFptr(MPI_Fnc_##func); \

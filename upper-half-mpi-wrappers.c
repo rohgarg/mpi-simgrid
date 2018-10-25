@@ -19,12 +19,12 @@
 #undef MPI_Send
 #undef MPI_Recv
 
-// DEFINE_FNC(int, Init, (int *) argc, (char ***) argv)
+DEFINE_FNC(int, Init, (int *) argc, (char ***) argv)
 
 DEFINE_FNC(int, Comm_rank, (int) group, (int *) world_rank)
-// 
-// DEFINE_FNC(int, Send, (const void *) buf, (int) count, (MPI_Datatype) datatype,
-//            (int) dest, (int) tag, (MPI_Comm) comm)
-// 
-// DEFINE_FNC(int, Recv, (void *) buf, (int) count, (MPI_Datatype) datatype,
-//            (int) source, (int) tag, (MPI_Comm) comm, (MPI_Status *) status)
+
+DEFINE_FNC(int, Send, (const void *) buf, (int) count, (MPI_Datatype) datatype,
+           (int) dest, (int) tag, (MPI_Comm) comm)
+
+DEFINE_FNC(int, Recv, (void *) buf, (int) count, (MPI_Datatype) datatype,
+           (int) source, (int) tag, (MPI_Comm) comm, (MPI_Status *) status)

@@ -28,8 +28,7 @@ main(int argc, char **argv)
   if (ret == POST_RESUME) {
     printf("\nResuming after ckpt...\n");
   } else if (ret == POST_RESTART) {
-    const char buf[] = "\nRestarting from a ckpt...\n";
-    write(0, buf, sizeof buf);
+    printf("\nRestarting from a ckpt...\n");
     rc = MPI_Init(&argc, &argv);
     // printf("\nMPI_Init returned: %d\n", rc);
   }

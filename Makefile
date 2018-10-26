@@ -6,12 +6,13 @@ RTLD_PATH=/lib64/ld-2.27.so
 MPI_INCLUDE_PATH=/usr/local/include
 
 FILE=kernel-loader
-KERNEL_LOADER_OBJS=${FILE}.o procmapsutils.o custom-loader.o mmap-wrapper.o sbrk-wrapper.o mpi-lh-if.o mem-restore.o utils.o
+KERNEL_LOADER_OBJS=${FILE}.o procmapsutils.o custom-loader.o mmap-wrapper.o sbrk-wrapper.o mpi-lh-if.o mem-restore.o utils.o trampoline_setup.o
 TARGET_OBJS=target.o
-TARGET_PRELOAD_LIB_OBJS=upper-half-wrappers.o upper-half-mpi-wrappers.o mem-ckpt.o procmapsutils.o utils.o
+TARGET_PRELOAD_LIB_OBJS=upper-half-wrappers.o upper-half-mpi-wrappers.o mem-ckpt.o procmapsutils.o utils.o trampoline_setup.o
 
 CFLAGS=-g3 -O0 -fPIC -I. -I${MPI_INCLUDE_PATH} -c -std=gnu11 -Wall -Werror
 KERNEL_LOADER_CFLAGS=-DSTANDALONE
+MPICC_FLAGS=-Wl,-Ttext-segment -Wl,0x800000
 
 KERNEL_LOADER_BIN=kernel-loader.exe
 TARGET_BIN=t.exe
@@ -43,7 +44,7 @@ ${FILE}.o: ${FILE}.c
 	${CC} ${CFLAGS} ${KERNEL_LOADER_CFLAGS} $< -o $@
 
 ${TARGET_BIN}: ${TARGET_OBJS}
-	${LD} -pie $< -o $@
+	${LD} $< -o $@
 
 ${TARGET_PRELOAD_LIB}: ${TARGET_PRELOAD_LIB_OBJS}
 	${LD} -shared $^ -o $@
@@ -52,7 +53,7 @@ ${TARGET_PRELOAD_LIB}: ${TARGET_PRELOAD_LIB_OBJS}
 # to link the kernel loader (which is really just emulating the lower
 # half) to a fixed address (0x800000)
 ${KERNEL_LOADER_BIN}: ${KERNEL_LOADER_OBJS}
-	${MPICC} ${MPICC_FLAGS} $^ -o $@
+	${MPICC} -static ${MPICC_FLAGS} $^ -o $@
 
 vi vim:
 	vim ${FILE}.c

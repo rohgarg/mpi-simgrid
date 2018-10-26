@@ -53,7 +53,7 @@ ${TARGET_PRELOAD_LIB}: ${TARGET_PRELOAD_LIB_OBJS}
 # to link the kernel loader (which is really just emulating the lower
 # half) to a fixed address (0x800000)
 ${KERNEL_LOADER_BIN}: ${KERNEL_LOADER_OBJS}
-	${MPICC} -static ${MPICC_FLAGS} $^ -o $@
+	${MPICC} -static ${MPICC_FLAGS} $^ -o $@ -lpthread
 
 vi vim:
 	vim ${FILE}.c
@@ -66,7 +66,7 @@ dist: clean
 	(dir=`basename $$PWD` && ls -l ../$$dir.tgz)
 
 tidy:
-	rm -f ./ckpt.img
+	rm -f ./ckpt.img ./addr.bin
 
 clean: tidy
 	rm -f ${KERNEL_LOADER_OBJS} ${TARGET_OBJS} ${KERNEL_LOADER_BIN} \

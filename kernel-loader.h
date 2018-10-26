@@ -34,7 +34,7 @@ GET_AUXV_ADDR(const char **env)
   return auxvec;
 }
 
-void runRtld();
+int runRtld();
 void* sbrkWrapper(intptr_t );
 void* mmapWrapper(void *, size_t , int , int , int , off_t );
 void* getEndofHeap();

@@ -4,6 +4,8 @@
 #include <signal.h>
 #include <ucontext.h>
 
+typedef char* VA;
+
 #define CKPT_SIGNAL  SIGUSR2
 
 typedef struct __CkptRestartState
@@ -26,6 +28,25 @@ typedef enum __CkptOrRestore
 CkptOrRestore_t doCheckpoint() __attribute__((weak));
 #define doCheckpoint() (doCheckpoint ? doCheckpoint() : 0)
 
-void restoreCheckpoint(const char *);
+int restoreCheckpoint(const char **);
+
+// Returns true if needle is in the haystack
+static inline int
+regionContains(const void *haystackStart,
+               const void *haystackEnd,
+               const void *needleStart,
+               const void *needleEnd)
+{
+  return needleStart >= haystackStart && needleEnd <= haystackEnd;
+}
+
+static inline int
+doAreasOverlap(VA addr1, size_t size1, VA addr2, size_t size2)
+{
+  VA end1 = (VA)addr1 + size1;
+  VA end2 = (VA)addr2 + size2;
+
+  return (addr1 >= addr2 && addr1 < end2) || (addr2 >= addr1 && addr2 < end1);
+}
 
 #endif // ifndef CKPT_RESTART_H

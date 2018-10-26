@@ -98,16 +98,6 @@ checkpointHandler(int signal, siginfo_t *info, void *ctx)
   }
 }
 
-// Returns true if needle is in the haystack
-static inline int
-regionContains(const void *haystackStart,
-               const void *haystackEnd,
-               const void *needleStart,
-               const void *needleEnd)
-{
-  return needleStart >= haystackStart && needleEnd <= haystackEnd;
-}
-
 static void
 checkpointMemory(int ckptfd)
 {

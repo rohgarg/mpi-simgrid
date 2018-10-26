@@ -44,10 +44,11 @@ possible experiment, without involving the complexities of DMTCP.
        upper half
 * [x] Add checkpoint-restart logic from mini-DMTCP assignment
 * [x] Test full checkpoint-restart functionality
-* [ ] Add code to restart one rank as thread
+* [x] Add code to restart one rank as thread
 * [ ] Add code for dummy SimGrid library to be used post restart
 * [ ] Add code to map lower half segments based on MPI rank
-* [ ] Add code to restart from checkpoint images of multiple ranks
+* [x] Add code to restart from checkpoint images of multiple ranks
+* [ ] Test restart from checkpoint images of multiple ranks
 
 ## Results
 

@@ -43,7 +43,7 @@ static void printRestartUsage();
 
 // This function loads in ld.so, sets up a separate stack for it, and jumps
 // to the entry point of ld.so
-void
+int
 runRtld()
 {
   int rc = -1;
@@ -56,13 +56,13 @@ runRtld()
   char *uhpreload = getenv("UH_PRELOAD");
   if (!ldname || !uhpreload) {
     printUsage();
-    return;
+    return -1;
   }
 
   DynObjInfo_t ldso = safeLoadLib(ldname);
   if (ldso.baseAddr == NULL || ldso.entryPoint == NULL) {
     DLOG(ERROR, "Error loading the runtime loader (%s). Exiting...\n", ldname);
-    return;
+    return -1;
   }
 
   DLOG(INFO, "New ld.so loaded at: %p\n", ldso.baseAddr);
@@ -72,7 +72,7 @@ runRtld()
   void *newStack = createNewStackForRtld(&ldso);
   if (!newStack) {
     DLOG(ERROR, "Error creating new stack for RTLD. Exiting...\n");
-    exit(-1);
+    return -1;
   }
   DLOG(INFO, "New stack start at: %p\n", newStack);
 
@@ -80,19 +80,19 @@ runRtld()
   void *newHeap = createNewHeapForRtld(&ldso);
   if (!newHeap) {
     DLOG(ERROR, "Error creating new heap for RTLD. Exiting...\n");
-    exit(-1);
+    return -1;
   }
   DLOG(INFO, "New heap mapped at: %p\n", newHeap);
 
   rc = insertTrampoline(ldso.mmapAddr, &mmapWrapper);
   if (rc < 0) {
     DLOG(ERROR, "Error inserting trampoline for mmap. Exiting...\n");
-    exit(-1);
+    return -1;
   }
   rc = insertTrampoline(ldso.sbrkAddr, &sbrkWrapper);
   if (rc < 0) {
     DLOG(ERROR, "Error inserting trampoline for sbrk. Exiting...\n");
-    exit(-1);
+    return -1;
   }
 
   // Everything is ready, let's set up the lower-half info struct for the upper
@@ -100,7 +100,7 @@ runRtld()
   rc = setupLowerHalfInfo();
   if (rc < 0) {
     DLOG(ERROR, "Failed to set up lhinfo for the upper half. Exiting...\n");
-    exit(-1);
+    return -1;
   }
 
   // Change the stack pointer to point to the new stack and jump into ld.so
@@ -108,6 +108,7 @@ runRtld()
   asm volatile (CLEAN_FOR_64_BIT(mov %0, %%esp; )
                 : : "g" (newStack) : "memory");
   asm volatile ("jmp *%0" : : "g" (ldso_entrypoint) : "memory");
+  return 0;
 }
 
 #ifdef STANDALONE
@@ -128,10 +129,9 @@ main(int argc, char **argv)
       DLOG(ERROR, "Failed to set up lhinfo for the upper half. Exiting...\n");
       exit(-1);
     }
-    restoreCheckpoint(argv[2]);
+    return restoreCheckpoint((const char**)&argv[2]);
   }
-  runRtld();
-  return 0;
+  return runRtld();
 }
 #endif
 

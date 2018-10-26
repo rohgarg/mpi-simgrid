@@ -84,7 +84,6 @@ runRtld()
   }
   DLOG(INFO, "New heap mapped at: %p\n", newHeap);
 
-  setUhBrk(newHeap); //  + PAGE_SIZE);
   rc = insertTrampoline(ldso.mmapAddr, &mmapWrapper);
   if (rc < 0) {
     DLOG(ERROR, "Error inserting trampoline for mmap. Exiting...\n");
@@ -430,7 +429,9 @@ createNewHeapForRtld(const DynObjInfo_t *info)
          strerror(errno));
     return NULL;
   }
+  mprotect(addr, PAGE_SIZE, PROT_NONE);
   setEndOfHeap((void*)((VA)addr + 100 * PAGE_SIZE));
+  setUhBrk((VA)addr  + PAGE_SIZE);
   return addr;
 }
 

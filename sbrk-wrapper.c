@@ -10,19 +10,35 @@
 static void *__curbrk;
 static void *__endOfHeap = 0;
 
+static void* __sbrkWrapper(intptr_t increment);
+
 void
 setEndOfHeap(void *addr)
 {
-  __curbrk = addr;
-  __endOfHeap = (void*)ROUND_UP(__curbrk);
+  __endOfHeap = (void*)ROUND_UP(addr);
 }
 
+void
+setUhBrk(void *addr)
+{
+  __curbrk = addr;
+}
+
+void*
+sbrkWrapper(intptr_t increment)
+{
+  void *addr = NULL;
+  JUMP_TO_LOWER_HALF(lhInfo.lhFsAddr);
+  addr = __sbrkWrapper(increment);
+  RETURN_TO_UPPER_HALF();
+  return addr;
+}
 
 /* Extend the process's data space by INCREMENT.
    If INCREMENT is negative, shrink data space by - INCREMENT.
    Return start of new space allocated, or -1 for errors.  */
-void*
-sbrkWrapper(intptr_t increment)
+static void*
+__sbrkWrapper(intptr_t increment)
 {
   void *oldbrk;
 

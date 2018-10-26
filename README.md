@@ -43,7 +43,11 @@ possible experiment, without involving the complexities of DMTCP.
 * [x] Test calling a MPI function (through lower-half's dlsym API) from the
        upper half
 * [x] Add checkpoint-restart logic from mini-DMTCP assignment
-* [ ] Test full checkpoint-restart functionality
+* [x] Test full checkpoint-restart functionality
+* [ ] Add code to restart one rank as thread
+* [ ] Add code for dummy SimGrid library to be used post restart
+* [ ] Add code to map lower half segments based on MPI rank
+* [ ] Add code to restart from checkpoint images of multiple ranks
 
 ## Results
 

@@ -2,6 +2,7 @@
 #include <elf.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <linux/limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -22,14 +23,15 @@
 //    https://github.com/torvalds/linux/blob/master/fs/binfmt_elf.c
 
 // FIXME: can we find this path at run time?
-const char DEBUG_FILES_PATH[] = "/usr/lib/debug/lib/x86_64-linux-gnu/";
+const char *DEBUG_FILES_PATH = "/usr/lib/debug/lib/x86_64-linux-gnu";
 
 static void get_elf_interpreter(int , Elf64_Addr *, char* , void* );
 static void* load_elf_interpreter(int , char* , Elf64_Addr *,
                                   void * , DynObjInfo_t* );
 static void* map_elf_interpreter_load_segment(int , Elf64_Phdr , void* );
-
-static void get_elf_debug_symbol_file(int fd, char* debug_symbol_file);
+#ifdef UBUNTU
+static void get_elf_debug_symbol_file(int , char* , size_t );
+#endif // ifdef UBUNTU
 
 // Global functions
 DynObjInfo_t
@@ -59,11 +61,9 @@ safeLoadLib(const char *name)
                                        &ld_so_entry, ld_so_addr, &info);
 
 #ifdef UBUNTU
-  char ldDebug[MAX_ELF_DEBUG_SZ];
-  get_elf_debug_symbol_file(ld_so_fd, ldDebug);
-
-  // const char *ldDebug = "/usr/lib/debug/lib/x86_64-linux-gnu/ld-2.27.so";
+  char ldDebug[PATH_MAX];
   int newFd = open(ldDebug, O_RDONLY);
+  get_elf_debug_symbol_file(newFd, ldDebug, sizeof ldDebug);
 #else
   const char *ldDebug = name;
   int newFd = ld_so_fd;
@@ -256,24 +256,22 @@ map_elf_interpreter_load_segment(int fd, Elf64_Phdr phdr, void *ld_so_addr)
   return base_address;
 }
 
+#ifdef UBUNTU
 static void
-get_elf_debug_symbol_file(int fd, char* debug_symbol_file) {
+get_elf_debug_symbol_file(int fd, char* debug_symbol_file, size_t len)
+{
   off_t filesz = lseek(fd, 0, SEEK_END);
-  void* addr;
-  addr = mmap(NULL, filesz, PROT_READ|PROT_WRITE, MAP_PRIVATE, fd, 0);
-  assert(addr != NULL);
+  void* addr = mmap(NULL, filesz, PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, 0);
+  assert(addr != MAP_FAILED);
 
-  Elf64_Ehdr* elf_header = (Elf64_Ehdr *)addr;
-  Elf64_Shdr* shdr = (Elf64_Shdr *) ((char*)addr + elf_header->e_shoff);
-  char* strtab;
-  strtab = (char*)((char*)addr + shdr[elf_header->e_shstrndx].sh_offset);
+  Elf64_Ehdr *elf_header = (Elf64_Ehdr *)addr;
+  Elf64_Shdr *shdr = (Elf64_Shdr *) ((VA)addr + elf_header->e_shoff);
+  char* strtab = (VA)addr + shdr[elf_header->e_shstrndx].sh_offset;
 
-  int i;
-  for(i=0; i<elf_header->e_shnum; ++i) {
+  for (int i = 0; i < elf_header->e_shnum; i++) {
     if (!strcmp(".gnu_debuglink", &strtab[shdr[i].sh_name])) {
-      strncpy(debug_symbol_file, DEBUG_FILES_PATH, sizeof(DEBUG_FILES_PATH)-1);
-      strcpy(debug_symbol_file + (sizeof(DEBUG_FILES_PATH)-1), (char*)addr + shdr[i].sh_offset);
-      // strncpy(debug_symbol_file, &strtab[shdr[i].sh_name], MAX_ELF_DEBUG_SZ);
+      snprintf(debug_symbol_file, len, "%s/%s",
+               DEBUG_FILES_PATH, (VA)addr + shdr[i].sh_offset);
       break;
     }
   }
@@ -281,5 +279,6 @@ get_elf_debug_symbol_file(int fd, char* debug_symbol_file) {
   // free the region the file occupied.
   assert(munmap(addr, filesz) != -1);
 
-  fprintf(stderr, "debug_symbol_file (ld.so): %s\n", debug_symbol_file);
+  DLOG(INFO, "Found debug symbols for ld.so in %s\n", debug_symbol_file);
 }
+#endif // ifdef UBUNTU

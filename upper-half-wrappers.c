@@ -69,9 +69,6 @@ reset_wrappers()
 static void
 readLhInfoAddr()
 {
-  static int dummy = 1;
-  while (!dummy);
-  dummy = 0;
   int fd = open(LH_FILE_NAME, O_RDONLY);
   if (fd < 0) {
     DLOG(ERROR, "Could not open addr.bin for reading. Error: %s",

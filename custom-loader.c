@@ -32,6 +32,8 @@ safeLoadLib(const char *name)
 {
   void *ld_so_addr = NULL;
   DynObjInfo_t info = {0};
+  off_t mmapOffset = 0;
+  off_t sbrkOffset = 0;
 
   int ld_so_fd;
   Elf64_Addr cmd_entry, ld_so_entry;
@@ -45,18 +47,33 @@ safeLoadLib(const char *name)
   // FIXME: The ELF Format manual says that we could pass the cmd_fd to ld.so,
   //   and it would use that to load it.
   close(cmd_fd);
-#ifndef UBUNTU
-   strncpy(elf_interpreter, name, sizeof elf_interpreter);
-#endif
+  strncpy(elf_interpreter, name, sizeof elf_interpreter);
 
   ld_so_fd = open(elf_interpreter, O_RDONLY);
   info.baseAddr = load_elf_interpreter(ld_so_fd, elf_interpreter,
-                                        &ld_so_entry, ld_so_addr, &info);
-  info.mmapAddr = (VA)info.baseAddr + get_symbol_offset(ld_so_fd, name, "mmap");
-  info.sbrkAddr = (VA)info.baseAddr + get_symbol_offset(ld_so_fd, name, "sbrk");
+                                       &ld_so_entry, ld_so_addr, &info);
+
+#ifdef UBUNTU
+  const char *ldDebug = "/usr/lib/debug/lib/x86_64-linux-gnu/ld-2.27.so";
+  int newFd = open(ldDebug, O_RDONLY);
+#else
+  const char *ldDebug = name;
+  int newFd = ld_so_fd;
+#endif // ifdef UBUNTU
+
+  mmapOffset = get_symbol_offset(newFd, ldDebug, "mmap");
+  sbrkOffset = get_symbol_offset(newFd, ldDebug, "sbrk");
+
+  info.mmapAddr = (VA)info.baseAddr + mmapOffset;
+  info.sbrkAddr = (VA)info.baseAddr + sbrkOffset;
   // FIXME: The ELF Format manual says that we could pass the ld_so_fd to ld.so,
   //   and it would use that to load it.
   close(ld_so_fd);
+
+#ifdef UBUNTU
+  close(newFd);
+#endif // ifdef UBUNTU
+
   info.entryPoint = (void*)((unsigned long)info.baseAddr +
                             (unsigned long)cmd_entry);
   return info;
@@ -93,28 +110,7 @@ get_elf_interpreter(int fd, Elf64_Addr *cmd_entry,
     assert(i < elf_hdr.e_phnum);
     rc = read(fd, &phdr, sizeof(phdr)); // Read consecutive program headers
     assert(rc == sizeof(phdr));
-#ifdef UBUNTU
-    if (phdr.p_type == PT_INTERP) break;
   }
-  lseek(fd, phdr.p_offset, SEEK_SET); // Point to beginning of elf interpreter
-  assert(phdr.p_filesz < MAX_ELF_INTERP_SZ);
-  rc = read(fd, elf_interpreter, phdr.p_filesz);
-  assert(rc == phdr.p_filesz);
-
-  DLOG(INFO, "Interpreter: %s\n", elf_interpreter);
-  { char buf[256] = "/usr/lib/debug";
-    buf[sizeof(buf)-1] = '\0';
-    int rc = 0;
-    rc = readlink(elf_interpreter, buf+strlen(buf), sizeof(buf)-strlen(buf)-1);
-    if (rc != -1 && access(buf, F_OK) == 0) {
-      // Debian family (Ubuntu, etc.) use this scheme to store debug symbols.
-      //   http://sourceware.org/gdb/onlinedocs/gdb/Separate-Debug-Files.html
-      DLOG(INFO, "Debug symbols for interpreter in: %s\n", buf);
-    }
-  }
-#else // ifdef UBUNTU
-  }
-#endif // ifdef UBUNTU
 }
 
 // Returns offset of symbol, or -1 on failure.

@@ -18,6 +18,9 @@ KERNEL_LOADER_BIN=kernel-loader.exe
 TARGET_BIN=t.exe
 TARGET_PRELOAD_LIB=libuhwrappers.so
 
+SIMGRID_OBJS=${FILE}.o procmapsutils.o custom-loader.o mmap-wrapper.o sbrk-wrapper.o mpi-lh-if.o mem-restore.o utils.o trampoline_setup.o lower-half-mpi.c
+SIMGRID_BIN=simgrid.exe
+
 ckpt.img: ${KERNEL_LOADER_BIN} ${TARGET_BIN} ${TARGET_PRELOAD_LIB} disableASLR
 	UH_PRELOAD=$$PWD/${TARGET_PRELOAD_LIB} TARGET_LD=${RTLD_PATH} ./$< $$PWD/${TARGET_BIN} arg1 arg2 arg3
 
@@ -30,6 +33,9 @@ gdb: ${KERNEL_LOADER_BIN} ${TARGET_BIN} ${TARGET_PRELOAD_LIB}
 restart: ${KERNEL_LOADER_BIN} ckpt.img
 	UH_PRELOAD=$$PWD/${TARGET_PRELOAD_LIB} TARGET_LD=${RTLD_PATH} ./$< --restore ./ckpt.img
 	echo 2 | sudo tee /proc/sys/kernel/randomize_va_space
+
+restart-simgrid: ${SIMGRID_BIN} ckpt.img
+	UH_PRELOAD=$$PWD/${TARGET_PRELOAD_LIB} TARGET_LD=${RTLD_PATH} ./$< --restore ./ckpt.img
 
 disableASLR:
 	echo 0 | sudo tee /proc/sys/kernel/randomize_va_space
@@ -49,11 +55,11 @@ ${TARGET_BIN}: ${TARGET_OBJS}
 ${TARGET_PRELOAD_LIB}: ${TARGET_PRELOAD_LIB_OBJS}
 	${LD} -shared $^ -o $@
 
-# Apparently, Nvidia libraries don't like -pie; so, we are forced
-# to link the kernel loader (which is really just emulating the lower
-# half) to a fixed address (0x800000)
 ${KERNEL_LOADER_BIN}: ${KERNEL_LOADER_OBJS}
 	${MPICC} -static ${MPICC_FLAGS} $^ -o $@ -lpthread
+
+${SIMGRID_BIN}: ${SIMGRID_OBJS}
+	${LD} -static ${MPICC_FLAGS} $^ -o $@ -lpthread
 
 vi vim:
 	vim ${FILE}.c

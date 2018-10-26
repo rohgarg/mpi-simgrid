@@ -16,7 +16,7 @@ main(int argc, char **argv)
   processArgs(argc, (const char**)argv);
 
   int rc = MPI_Init(&argc, &argv);
-  printf("MPI_Init returned: %d\n", rc);
+  printf("App: MPI_Init returned: %d\n", rc);
 
   while (i < 2) {
     printf("%d ", i);
@@ -24,15 +24,17 @@ main(int argc, char **argv)
     sleep(2);
     i++;
   }
+  printf("\n");
+
   CkptOrRestore_t ret = doCheckpoint();
   if (ret == POST_RESUME) {
-    printf("\nResuming after ckpt...\n");
+    printf("App: Resuming after ckpt...\n");
   } else if (ret == POST_RESTART) {
-    printf("\nRestarting from a ckpt...\n");
+    printf("App: Restarting from a ckpt...\n");
+    printf("App: Calling MPI_Init after restart...\n");
     rc = MPI_Init(&argc, &argv);
-    // printf("\nMPI_Init returned: %d\n", rc);
+    printf("App: MPI_Init returned: %d\n", rc);
   }
-
 
   while (i < 4) {
     printf("%d ", i);
@@ -40,6 +42,7 @@ main(int argc, char **argv)
     sleep(2);
     i++;
   }
+  printf("\n");
 
   return 0;
 }
@@ -48,7 +51,7 @@ static void
 processArgs(int argc, const char** argv)
 {
   if (argc > 1) {
-    printf("Application was called with the following args: ");
+    printf("App: called with the following args: ");
     for (int j = 1; j < argc; j++) {
       printf("%s ", argv[j]);
     }

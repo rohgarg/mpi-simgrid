@@ -23,6 +23,7 @@
 //    https://github.com/torvalds/linux/blob/master/fs/binfmt_elf.c
 
 // FIXME: can we find this path at run time?
+
 const char *DEBUG_FILES_PATH = "/usr/lib/debug/lib/x86_64-linux-gnu";
 
 static void get_elf_interpreter(int , Elf64_Addr *, char* , void* );
@@ -30,7 +31,7 @@ static void* load_elf_interpreter(int , char* , Elf64_Addr *,
                                   void * , DynObjInfo_t* );
 static void* map_elf_interpreter_load_segment(int , Elf64_Phdr , void* );
 #ifdef UBUNTU
-static void get_elf_debug_symbol_file(int , char* , size_t );
+void get_debug_symbol_file(int , char* , size_t );
 #endif // ifdef UBUNTU
 
 // Global functions
@@ -62,8 +63,8 @@ safeLoadLib(const char *name)
 
 #ifdef UBUNTU
   char ldDebug[PATH_MAX];
+  get_debug_symbol_file(ld_so_fd, ldDebug, sizeof ldDebug);
   int newFd = open(ldDebug, O_RDONLY);
-  get_elf_debug_symbol_file(newFd, ldDebug, sizeof ldDebug);
 #else
   const char *ldDebug = name;
   int newFd = ld_so_fd;
@@ -257,8 +258,8 @@ map_elf_interpreter_load_segment(int fd, Elf64_Phdr phdr, void *ld_so_addr)
 }
 
 #ifdef UBUNTU
-static void
-get_elf_debug_symbol_file(int fd, char* debug_symbol_file, size_t len)
+void
+get_debug_symbol_file(int fd, char* debug_symbol_file, size_t len)
 {
   off_t filesz = lseek(fd, 0, SEEK_END);
   void* addr = mmap(NULL, filesz, PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, 0);
@@ -278,7 +279,5 @@ get_elf_debug_symbol_file(int fd, char* debug_symbol_file, size_t len)
 
   // free the region the file occupied.
   assert(munmap(addr, filesz) != -1);
-
-  DLOG(INFO, "Found debug symbols for ld.so in %s\n", debug_symbol_file);
 }
 #endif // ifdef UBUNTU

@@ -25,7 +25,8 @@ get_symbol_offset(int fd, const char *ldname, const char *symbol)
   Elf64_Shdr symtab;
   Elf64_Sym symtab_entry;
   // FIXME: This needs to be dynamic
-  char strtab[90000];
+  // char strtab[90000]; // libc's strtab is '90148' FIXME: I don't know why that number was chosen
+  char strtab[900000]; // FIXME: '900000' is an overkill for just debugging.
 
   int symtab_found = 0;
 

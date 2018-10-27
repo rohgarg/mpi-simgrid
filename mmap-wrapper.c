@@ -4,6 +4,8 @@
 #include <assert.h>
 #include <sys/mman.h>
 #include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 #include <unistd.h>
 #include <stdlib.h>
 
@@ -11,6 +13,7 @@
 #include "kernel-loader.h"
 #include "utils.h"
 #include "trampoline_setup.h"
+#include "custom-loader.h" // get_debug_symbol_file()
 
 #define MMAP_OFF_HIGH_MASK ((-(4096ULL << 1) << (8 * sizeof (off_t) - 1)))
 #define MMAP_OFF_LOW_MASK  (4096ULL - 1)
@@ -21,6 +24,7 @@
 //  1. Make the size of list dynamic
 //  2. Remove region from list when the application calls munmap
 #define MAX_TRACK   1000
+
 static int numRegions = 0;
 static MmapInfo_t mmaps[MAX_TRACK] = {0};
 
@@ -58,14 +62,29 @@ patchLibc(int fd, const void *base, const char *glibc)
   DLOG(INFO, "Patching libc (%s) @ %p\n", glibc, base);
   // Save incoming offset
   off_t saveOffset = lseek(fd, 0, SEEK_CUR);
-  off_t mmapOffset = get_symbol_offset(fd, glibc, MMAP_SYMBOL_NAME);
+
+#ifdef UBUNTU
+  char libcDebug[MAX_ELF_DEBUG_SZ];
+  get_debug_symbol_file(fd, libcDebug, sizeof(libcDebug));
+  int newFd = open(libcDebug, O_RDONLY);
+#else
+  const char *libcDebug = glibc;
+  int newFd = fd;
+#endif // ifdef UBUNTU
+
+
+  off_t mmapOffset = get_symbol_offset(newFd, libcDebug, MMAP_SYMBOL_NAME);
   insertTrampoline((VA)base + mmapOffset, &mmapWrapper);
-  off_t sbrkOffset = get_symbol_offset(fd, glibc, SBRK_SYMBOL_NAME);
+  off_t sbrkOffset = get_symbol_offset(newFd, libcDebug, SBRK_SYMBOL_NAME);
   insertTrampoline((VA)base + sbrkOffset, &sbrkWrapper);
   DLOG(INFO, "Patched libc (%s) @ %p: offset(sbrk): %zx; offset(mmap): %zx\n",
        glibc, base, sbrkOffset, mmapOffset);
   // Restore file offset to not upset the caller
-  lseek(fd, saveOffset, SEEK_SET);
+  lseek(newFd, saveOffset, SEEK_SET);
+
+#ifdef UBUNTU
+  close(newFd);
+#endif
 }
 
 static void*

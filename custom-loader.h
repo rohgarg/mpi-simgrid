@@ -15,7 +15,10 @@ typedef struct __DynObjInfo
 } DynObjInfo_t;
 
 DynObjInfo_t safeLoadLib(const char *);
+void get_debug_symbol_file(int , char* , size_t );
 
-// const char DEBUG_FILES_PATH [] = "/usr/lib/debug/lib/x86_64-linux-gnu/";
+#ifdef UBUNTU
+extern const char* DEBUG_FILES_PATH;
+#endif // ifdef UBUNTU
 
 #endif // ifndef CUSTOM_LOADER_H

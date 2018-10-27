@@ -49,10 +49,12 @@ possible experiment, without involving the complexities of DMTCP.
 * [ ] Add code to map upper-half segments based on MPI rank at launch time
 * [x] Add code to restart from checkpoint images of multiple ranks
 * [ ] Test restart from checkpoint images of multiple ranks
+* [ ] Create a fake VDSO page for the upper half (See [here](#known-issues)
+      for more details).
 
 ## Results
 
-See the list of open items in the [TODO](#todo) section.
+The basic idea works. See the list of open items in the [TODO](#todo) section.
 
 ## Appendix
 
@@ -62,3 +64,8 @@ See the list of open items in the [TODO](#todo) section.
 2. Run `make restart` to build and run the code.
 
 ### Known issues
+
+1. The application might crash after restart if it tries to call
+   `gettimeofday()`. Since the upper half is dynamically-linked, it
+   needs the VDSO page for making calls such as, `gettimeofday()`, etc.
+   And the location of the VDSO page might change post restart.

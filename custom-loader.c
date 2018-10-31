@@ -22,17 +22,12 @@
 // The kernel code is here (not recommended for a first reading):
 //    https://github.com/torvalds/linux/blob/master/fs/binfmt_elf.c
 
-// FIXME: can we find this path at run time?
-
-const char *DEBUG_FILES_PATH = "/usr/lib/debug/lib/x86_64-linux-gnu";
-
+#if 0
 static void get_elf_interpreter(int , Elf64_Addr *, char* , void* );
+#endif // if 0
 static void* load_elf_interpreter(int , char* , Elf64_Addr *,
                                   void * , DynObjInfo_t* );
 static void* map_elf_interpreter_load_segment(int , Elf64_Phdr , void* );
-#ifdef UBUNTU
-void get_debug_symbol_file(int , char* , size_t );
-#endif // ifdef UBUNTU
 
 // Global functions
 DynObjInfo_t
@@ -44,14 +39,13 @@ safeLoadLib(const char *name)
   off_t sbrkOffset = 0;
 
   int ld_so_fd;
-  Elf64_Addr cmd_entry, ld_so_entry;
+  Elf64_Addr ld_so_entry;
   char elf_interpreter[MAX_ELF_INTERP_SZ];
 
   // FIXME: Do we need to make it dynamic? Is setting this required?
   // ld_so_addr = (void*)0x7ffff81d5000;
   // ld_so_addr = (void*)0x7ffff7dd7000;
   int cmd_fd = open(name, O_RDONLY);
-  get_elf_interpreter(cmd_fd, &cmd_entry, elf_interpreter, ld_so_addr);
   // FIXME: The ELF Format manual says that we could pass the cmd_fd to ld.so,
   //   and it would use that to load it.
   close(cmd_fd);
@@ -60,36 +54,28 @@ safeLoadLib(const char *name)
   ld_so_fd = open(elf_interpreter, O_RDONLY);
   info.baseAddr = load_elf_interpreter(ld_so_fd, elf_interpreter,
                                        &ld_so_entry, ld_so_addr, &info);
-
-#ifdef UBUNTU
-  char ldDebug[PATH_MAX];
-  get_debug_symbol_file(ld_so_fd, ldDebug, sizeof ldDebug);
-  int newFd = open(ldDebug, O_RDONLY);
-#else
-  const char *ldDebug = name;
-  int newFd = ld_so_fd;
-#endif // ifdef UBUNTU
-
-  mmapOffset = get_symbol_offset(newFd, ldDebug, "mmap");
-  sbrkOffset = get_symbol_offset(newFd, ldDebug, "sbrk");
-
-  info.mmapAddr = (VA)info.baseAddr + mmapOffset;
-  info.sbrkAddr = (VA)info.baseAddr + sbrkOffset;
   // FIXME: The ELF Format manual says that we could pass the ld_so_fd to ld.so,
   //   and it would use that to load it.
   close(ld_so_fd);
 
-#ifdef UBUNTU
-  close(newFd);
-#endif // ifdef UBUNTU
+  mmapOffset = get_symbol_offset(name, MMAP_SYMBOL_NAME);
+  sbrkOffset = get_symbol_offset(name, SBRK_SYMBOL_NAME);
+  if (mmapOffset == -1 || sbrkOffset == -1) {
+    DLOG(ERROR, "Failed to find offsets for sbrk and mmap in %s\n", name);
+    goto end;
+  }
 
-  info.entryPoint = (void*)((unsigned long)info.baseAddr +
-                            (unsigned long)cmd_entry);
+  info.mmapAddr = (VA)info.baseAddr + mmapOffset;
+  info.sbrkAddr = (VA)info.baseAddr + sbrkOffset;
+
+end:
+  info.entryPoint = (void*)((uintptr_t)info.baseAddr + (uintptr_t)ld_so_entry);
   return info;
 }
 
 
 // Local functions
+#if 0
 static void
 get_elf_interpreter(int fd, Elf64_Addr *cmd_entry,
                     char* elf_interpreter, void *ld_so_addr)
@@ -121,6 +107,7 @@ get_elf_interpreter(int fd, Elf64_Addr *cmd_entry,
     assert(rc == sizeof(phdr));
   }
 }
+#endif // if 0
 
 static void*
 load_elf_interpreter(int fd, char *elf_interpreter,
@@ -164,6 +151,7 @@ load_elf_interpreter(int fd, char *elf_interpreter,
   }
   info->phnum = elf_hdr.e_phnum;
   info->phdr = (VA)baseAddr + elf_hdr.e_phoff;
+  *ld_so_entry = elf_hdr.e_entry;
   return baseAddr;
 }
 
@@ -256,28 +244,3 @@ map_elf_interpreter_load_segment(int fd, Elf64_Phdr phdr, void *ld_so_addr)
   }
   return base_address;
 }
-
-#ifdef UBUNTU
-void
-get_debug_symbol_file(int fd, char* debug_symbol_file, size_t len)
-{
-  off_t filesz = lseek(fd, 0, SEEK_END);
-  void* addr = mmap(NULL, filesz, PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, 0);
-  assert(addr != MAP_FAILED);
-
-  Elf64_Ehdr *elf_header = (Elf64_Ehdr *)addr;
-  Elf64_Shdr *shdr = (Elf64_Shdr *) ((VA)addr + elf_header->e_shoff);
-  char* strtab = (VA)addr + shdr[elf_header->e_shstrndx].sh_offset;
-
-  for (int i = 0; i < elf_header->e_shnum; i++) {
-    if (!strcmp(".gnu_debuglink", &strtab[shdr[i].sh_name])) {
-      snprintf(debug_symbol_file, len, "%s/%s",
-               DEBUG_FILES_PATH, (VA)addr + shdr[i].sh_offset);
-      break;
-    }
-  }
-
-  // free the region the file occupied.
-  assert(munmap(addr, filesz) != -1);
-}
-#endif // ifdef UBUNTU

@@ -5,9 +5,7 @@
 #include <sys/mman.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <fcntl.h>
 #include <unistd.h>
-#include <stdlib.h>
 
 #include "common.h"
 #include "kernel-loader.h"
@@ -57,34 +55,19 @@ patchLibc(int fd, const void *base, const char *glibc)
 {
   assert(base);
   assert(fd > 0);
-  const char *MMAP_SYMBOL_NAME = "mmap";
-  const char *SBRK_SYMBOL_NAME = "sbrk";
+
   DLOG(INFO, "Patching libc (%s) @ %p\n", glibc, base);
-  // Save incoming offset
-  off_t saveOffset = lseek(fd, 0, SEEK_CUR);
 
-#ifdef UBUNTU
-  char libcDebug[MAX_ELF_DEBUG_SZ];
-  get_debug_symbol_file(fd, libcDebug, sizeof(libcDebug));
-  int newFd = open(libcDebug, O_RDONLY);
-#else
-  const char *libcDebug = glibc;
-  int newFd = fd;
-#endif // ifdef UBUNTU
-
-
-  off_t mmapOffset = get_symbol_offset(newFd, libcDebug, MMAP_SYMBOL_NAME);
+  off_t mmapOffset = get_symbol_offset(glibc, MMAP_SYMBOL_NAME);
+  off_t sbrkOffset = get_symbol_offset(glibc, SBRK_SYMBOL_NAME);
+  if (mmapOffset == -1 || sbrkOffset == -1) {
+    DLOG(ERROR, "Failed to find offsets for sbrk and mmap in %s\n", glibc);
+    return;
+  }
   insertTrampoline((VA)base + mmapOffset, &mmapWrapper);
-  off_t sbrkOffset = get_symbol_offset(newFd, libcDebug, SBRK_SYMBOL_NAME);
   insertTrampoline((VA)base + sbrkOffset, &sbrkWrapper);
   DLOG(INFO, "Patched libc (%s) @ %p: offset(sbrk): %zx; offset(mmap): %zx\n",
        glibc, base, sbrkOffset, mmapOffset);
-  // Restore file offset to not upset the caller
-  lseek(newFd, saveOffset, SEEK_SET);
-
-#ifdef UBUNTU
-  close(newFd);
-#endif
 }
 
 static void*

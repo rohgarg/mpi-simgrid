@@ -3,7 +3,7 @@ CC=gcc
 LD=gcc
 MPICC=mpicc
 RTLD_PATH=/lib64/ld-linux-x86-64.so.2
-MPI_INCLUDE_PATH=/home/ones/mpich-install/include/
+MPI_INCLUDE_PATH=/usr/lib/mpich-install/include/
 
 FILE=kernel-loader
 KERNEL_LOADER_OBJS=${FILE}.o procmapsutils.o custom-loader.o mmap-wrapper.o sbrk-wrapper.o mpi-lh-if.o mem-restore.o utils.o trampoline_setup.o

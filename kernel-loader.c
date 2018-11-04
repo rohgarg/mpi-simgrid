@@ -14,6 +14,9 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 
+#include <sys/time.h>
+#include <sys/resource.h>
+
 #include "common.h"
 #include "ckpt-restart.h"
 #include "custom-loader.h"
@@ -22,6 +25,9 @@
 #include "trampoline_setup.h"
 
 LowerHalfInfo_t lhInfo;
+
+unsigned long addr_space_begin;
+off_t addr_space_size;
 
 // Local function declarations
 static void getProcStatField(enum Procstat_t , char *, size_t );
@@ -38,6 +44,9 @@ static int writeLhInfoToFile();
 static int setupLowerHalfInfo();
 static void printUsage();
 static void printRestartUsage();
+static void confine_addr_space(char* addr_space_begin, unsigned long size);
+static void getVvarRegion(Area*);
+static void getVdsoRegion(Area*);
 
 // Global functions
 
@@ -54,6 +63,17 @@ runRtld()
   // Load RTLD (ld.so)
   char *ldname  = getenv("TARGET_LD");
   char *uhpreload = getenv("UH_PRELOAD");
+  char *start_addr_ = getenv("ADDR_BEGIN");
+  // FIXME: 'start_addr' must be page aligned.
+  sscanf(start_addr_, "%lu", &addr_space_begin);
+  char* addr_space_size_ = getenv("ADDR_SPACE_SIZE"); // number of pages
+  sscanf(addr_space_size_, "%lu", &addr_space_size);
+  addr_space_size *= 4096; // FIXME: find dynamically the 'page size'
+
+  // FIXME: find dynamically the 'page size'
+  confine_addr_space((char*)addr_space_begin, addr_space_size);
+
+  // printf("ADDR_BEGIN: %p\n", (char*)start_addr);
   if (!ldname || !uhpreload) {
     printUsage();
     return -1;
@@ -489,4 +509,84 @@ setupLowerHalfInfo()
     return -1;
   }
   return 0;
+}
+
+
+static void
+confine_addr_space(char* addr_space_begin, unsigned long size) {
+  void* addr;
+  size_t map_size;
+  int prot = PROT_NONE;
+  int flags = MAP_FIXED | MAP_ANONYMOUS | MAP_PRIVATE;
+
+  // extend the heap to reach 'addr_space_begin
+  struct rlimit rlimit_ = {.rlim_cur = RLIM_INFINITY, .rlim_max = RLIM_INFINITY};
+  if (setrlimit(RLIMIT_DATA, &rlimit_) != 0) {
+    perror("setrlimit()");
+    exit(1);
+  }
+  brk(addr_space_begin);
+  sbrk(0);
+
+  // 'addr_space_begin+size' - vvar
+  Area vvar;
+  getVvarRegion(&vvar);
+  addr = (void*)(addr_space_begin + size);
+  map_size = (vvar.addr - (char*)addr);
+  if (mmap(addr, map_size, prot, flags, -1, 0) == MAP_FAILED) {
+    perror("mmap()");
+    exit(1);
+  }
+  // vvar - vdso
+  Area vdso;
+  getVdsoRegion(&vdso);
+  addr = (void*)vvar.endAddr;
+  map_size = (vdso.addr - vvar.endAddr);
+  if (map_size > 0) {
+    if (mmap(addr, map_size, prot, flags, -1, 0) == MAP_FAILED) {
+      perror("mmap()");
+      exit(1);
+    }
+  }
+  // vdso - stack
+  Area stack;
+  getStackRegion(&stack);
+  addr = (void*)vdso.endAddr;
+  map_size = (stack.addr - vdso.endAddr) - (4096 * 10);
+  if (mmap(addr, map_size, prot, flags, -1, 0) == MAP_FAILED) {
+    perror("mmap()");
+    exit(1);
+  }
+
+  return;
+}
+
+// Returns the 'vvar' area by reading the proc maps
+static void
+getVvarRegion(Area *vvar) // OUT
+{
+  Area area;
+  int mapsfd = open("/proc/self/maps", O_RDONLY);
+  while (readMapsLine(mapsfd, &area)) {
+    if (strstr(area.name, "[vvar]")) {
+      *vvar = area;
+      break;
+    }
+  }
+  close(mapsfd);
+}
+
+// Returns the 'vdso' area by reading the proc maps
+static void
+getVdsoRegion(Area *vdso) // OUT
+{
+  Area area;
+  int mapsfd = open("/proc/self/maps", O_RDONLY);
+  while (readMapsLine(mapsfd, &area)) {
+    if (strstr(area.name, "[vdso]")) {
+      *vdso = area;
+      break;
+    }
+  }
+  close(mapsfd);
 }

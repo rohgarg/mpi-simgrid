@@ -1,6 +1,13 @@
 #ifndef KERNEL_LOADER_H
 #define KERNEL_LOADER_H
 
+// FIXME: Add better comment for 'addr_space_begin'
+// Each rank will be confined in an address space so that 
+// when brought together at restart they won't be an 
+// addr. space conflit
+extern unsigned long addr_space_begin;
+extern off_t addr_space_size;
+
 // Returns pointer to argc, given a pointer to end of stack
 static inline void*
 GET_ARGC_ADDR(const void* stackEnd)

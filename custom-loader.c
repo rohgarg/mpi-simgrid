@@ -180,7 +180,14 @@ map_elf_interpreter_load_segment(int fd, Elf64_Phdr phdr, void *ld_so_addr)
   int vaddr = phdr.p_vaddr;
 
   int flags = MAP_PRIVATE;
-  unsigned long addr = ROUND_DOWN(base_address + vaddr);
+  unsigned long addr;
+  if (first_time) {
+    // FIXME: I'm being lazy puting 'ld.so' 
+    //        in the middle of the allotted address space
+    addr = ROUND_DOWN(addr_space_begin + (addr_space_size/2) + vaddr);
+  } else {
+    addr = ROUND_DOWN(base_address + vaddr);
+  }
   size_t size = ROUND_UP(phdr.p_filesz + PAGE_OFFSET(phdr.p_vaddr));
   off_t offset = phdr.p_offset - PAGE_OFFSET(phdr.p_vaddr);
 
@@ -193,12 +200,14 @@ map_elf_interpreter_load_segment(int fd, Elf64_Phdr phdr, void *ld_so_addr)
   } else {
     flags |= MAP_FIXED;
   }
+  flags |= MAP_FIXED;
   if (ld_so_addr) {
     flags |= MAP_FIXED;
   }
   // FIXME:  On first load segment, we should map 0x400000 (2*phdr.p_align),
   //         and then unmap the unused portions later after all the
   //         LOAD segments are mapped.  This is what ld.so would do.
+
   rc2 = mmapWrapper((void *)addr, size, prot, MAP_PRIVATE, fd, offset);
   if (rc2 == MAP_FAILED) {
     DLOG(ERROR, "Failed to map memory region at %p. Error:%s\n",

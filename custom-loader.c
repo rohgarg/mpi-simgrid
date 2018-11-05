@@ -181,13 +181,27 @@ map_elf_interpreter_load_segment(int fd, Elf64_Phdr phdr, void *ld_so_addr)
 
   int flags = MAP_PRIVATE;
   unsigned long addr;
+
+  // FIXME: this part should be fused in the whole function.
   if (first_time) {
-    // FIXME: I'm being lazy puting 'ld.so' 
-    //        in the middle of the allotted address space
-    addr = ROUND_DOWN(addr_space_begin + (addr_space_size/2) + vaddr);
-  } else {
-    addr = ROUND_DOWN(base_address + vaddr);
+    int rank_ID = atoi(getenv("RANK_ID"));
+    unsigned long _4GB = (unsigned long)1 << 32;
+    off_t ld_so_offset = (3 * _4GB) / 4;
+    // read "confine_addr_space.org" in DOC for more info.
+    base_address = (char*)(_4GB + _4GB * rank_ID + ld_so_offset);
+    flags |= MAP_FIXED;
   }
+
+//   if (first_time) {
+//     // FIXME: I'm being lazy puting 'ld.so' 
+//     //        in the middle of the allotted address space
+//     addr = ROUND_DOWN(addr_space_begin + (addr_space_size/2) + vaddr);
+//   } else {
+//     addr = ROUND_DOWN(base_address + vaddr);
+//   }
+
+  addr = ROUND_DOWN(base_address + vaddr);
+
   size_t size = ROUND_UP(phdr.p_filesz + PAGE_OFFSET(phdr.p_vaddr));
   off_t offset = phdr.p_offset - PAGE_OFFSET(phdr.p_vaddr);
 

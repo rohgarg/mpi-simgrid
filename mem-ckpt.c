@@ -19,7 +19,9 @@
 #include "utils.h"
 
 const char *PROC_SELF_MAPS = "/proc/self/maps";
-const char *CKPT_IMG = "./ckpt.img";
+
+// const char *CKPT_IMG = "./ckpt.img";
+char *CKPT_IMG;
 
 static CkptOrRestore_t state = RUNNING;
 
@@ -47,6 +49,16 @@ installCkptHandler()
          "Exiting...\n", strerror(errno));
     exit(-1);
   }
+
+  static char ckpt_img[1024];
+  memcpy(ckpt_img, "./rank_", strlen("./rank_"));
+  char* rank_ID;
+  assert((rank_ID = getenv("RANK_ID")) != NULL);
+  memcpy(ckpt_img+strlen("./rank_"), rank_ID, 1);
+  memcpy(ckpt_img+strlen("./rank_x"), "_ckpt.img", sizeof("_ckpt.img"));
+  
+  CKPT_IMG = ckpt_img;
+  // memcpy(CKPT_IMG, ckpt_img, strlen(ckpt_img));
   state = RUNNING;
 }
 

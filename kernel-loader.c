@@ -44,7 +44,7 @@ static int writeLhInfoToFile();
 static int setupLowerHalfInfo();
 static void printUsage();
 static void printRestartUsage();
-static void confine_addr_space(char* addr_space_begin, unsigned long size);
+static void confine_addr_space(int);
 static void getVvarRegion(Area*);
 static void getVdsoRegion(Area*);
 
@@ -63,15 +63,11 @@ runRtld()
   // Load RTLD (ld.so)
   char *ldname  = getenv("TARGET_LD");
   char *uhpreload = getenv("UH_PRELOAD");
-  char *start_addr_ = getenv("ADDR_BEGIN");
-  // FIXME: 'start_addr' must be page aligned.
-  sscanf(start_addr_, "%lu", &addr_space_begin);
-  char* addr_space_size_ = getenv("ADDR_SPACE_SIZE"); // number of pages
-  sscanf(addr_space_size_, "%lu", &addr_space_size);
-  addr_space_size *= 4096; // FIXME: find dynamically the 'page size'
+  
+  int rank_ID = atoi(getenv("RANK_ID"));
 
   // FIXME: find dynamically the 'page size'
-  confine_addr_space((char*)addr_space_begin, addr_space_size);
+  confine_addr_space(rank_ID);
 
   // printf("ADDR_BEGIN: %p\n", (char*)start_addr);
   if (!ldname || !uhpreload) {
@@ -511,55 +507,103 @@ setupLowerHalfInfo()
   return 0;
 }
 
-
 static void
-confine_addr_space(char* addr_space_begin, unsigned long size) {
+confine_addr_space(int rank_ID) {
   void* addr;
   size_t map_size;
   int prot = PROT_NONE;
   int flags = MAP_FIXED | MAP_ANONYMOUS | MAP_PRIVATE;
 
-  // extend the heap to reach 'addr_space_begin
-  struct rlimit rlimit_ = {.rlim_cur = RLIM_INFINITY, .rlim_max = RLIM_INFINITY};
-  if (setrlimit(RLIMIT_DATA, &rlimit_) != 0) {
-    perror("setrlimit()");
-    exit(1);
-  }
-  brk(addr_space_begin);
-  sbrk(0);
+  unsigned long _4GB;
+  void* addr_space_begin; // the
 
-  // 'addr_space_begin+size' - vvar
+
+  _4GB = (unsigned long)1 << 32;
+
+  // confine "kernel loader" within the bottom 4GB
+  // TODO: should we move the stack to reside in the bottom 4GB?
+  //       at this point I don't see any reason in doing so.
+  addr_space_begin = (void*)(_4GB + rank_ID * _4GB);
+  struct rlimit rlim = {.rlim_cur = RLIM_INFINITY, .rlim_max = RLIM_INFINITY};
+  assert(setrlimit(RLIMIT_DATA, &rlim) == 0);
+  // FIXME: "malloc()" is somehow aware that there is an unused huge chunk of memory.
+  //        and 'sbrk()' has no clue.
+  assert(brk((void*)addr_space_begin) == 0);
+
+  // Book region ['address_space_begin + _4GB' - 'beginning of vvar']
   Area vvar;
   getVvarRegion(&vvar);
-  addr = (void*)(addr_space_begin + size);
+  addr = (void*)((char*)addr_space_begin + _4GB);
   map_size = (vvar.addr - (char*)addr);
-  if (mmap(addr, map_size, prot, flags, -1, 0) == MAP_FAILED) {
-    perror("mmap()");
-    exit(1);
-  }
-  // vvar - vdso
+  assert(mmap(addr, map_size, prot, flags, -1, 0) != MAP_FAILED);
+
+  // Book region ['end of vvar' - 'beginning of vdso']
   Area vdso;
   getVdsoRegion(&vdso);
   addr = (void*)vvar.endAddr;
-  map_size = (vdso.addr - vvar.endAddr);
+  map_size = (vdso.addr - (char*)addr);
   if (map_size > 0) {
-    if (mmap(addr, map_size, prot, flags, -1, 0) == MAP_FAILED) {
-      perror("mmap()");
-      exit(1);
-    }
+    assert(mmap(addr, map_size, prot, flags, -1, 0) != MAP_FAILED);
   }
-  // vdso - stack
+
+  // Book region ['end of vdso' - 'beginning of stack']
   Area stack;
   getStackRegion(&stack);
   addr = (void*)vdso.endAddr;
-  map_size = (stack.addr - vdso.endAddr) - (4096 * 10);
-  if (mmap(addr, map_size, prot, flags, -1, 0) == MAP_FAILED) {
-    perror("mmap()");
-    exit(1);
-  }
+  map_size = (stack.addr - vdso.endAddr);
+  assert(mmap(addr, map_size, prot, flags, -1, 0) != MAP_FAILED);
 
   return;
 }
+
+// static void
+// confine_addr_space(char* addr_space_begin, unsigned long size) {
+//   void* addr;
+//   size_t map_size;
+//   int prot = PROT_NONE;
+//   int flags = MAP_FIXED | MAP_ANONYMOUS | MAP_PRIVATE;
+// 
+//   // extend the heap to reach 'addr_space_begin
+//   struct rlimit rlimit_ = {.rlim_cur = RLIM_INFINITY, .rlim_max = RLIM_INFINITY};
+//   if (setrlimit(RLIMIT_DATA, &rlimit_) != 0) {
+//     perror("setrlimit()");
+//     exit(1);
+//   }
+//   brk(addr_space_begin);
+//   sbrk(0);
+// 
+//   // 'addr_space_begin+size' - vvar
+//   Area vvar;
+//   getVvarRegion(&vvar);
+//   addr = (void*)(addr_space_begin + size);
+//   map_size = (vvar.addr - (char*)addr);
+//   if (mmap(addr, map_size, prot, flags, -1, 0) == MAP_FAILED) {
+//     perror("mmap()");
+//     exit(1);
+//   }
+//   // vvar - vdso
+//   Area vdso;
+//   getVdsoRegion(&vdso);
+//   addr = (void*)vvar.endAddr;
+//   map_size = (vdso.addr - vvar.endAddr);
+//   if (map_size > 0) {
+//     if (mmap(addr, map_size, prot, flags, -1, 0) == MAP_FAILED) {
+//       perror("mmap()");
+//       exit(1);
+//     }
+//   }
+//   // vdso - stack
+//   Area stack;
+//   getStackRegion(&stack);
+//   addr = (void*)vdso.endAddr;
+//   map_size = (stack.addr - vdso.endAddr) - (4096 * 10);
+//   if (mmap(addr, map_size, prot, flags, -1, 0) == MAP_FAILED) {
+//     perror("mmap()");
+//     exit(1);
+//   }
+// 
+//   return;
+// }
 
 // Returns the 'vvar' area by reading the proc maps
 static void

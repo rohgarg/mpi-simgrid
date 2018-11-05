@@ -24,10 +24,15 @@ SIMGRID_BIN=simgrid.exe
 ckpt.img: ${KERNEL_LOADER_BIN} ${TARGET_BIN} ${TARGET_PRELOAD_LIB} disableASLR
 	UH_PRELOAD=$$PWD/${TARGET_PRELOAD_LIB} TARGET_LD=${RTLD_PATH} ./$< $$PWD/${TARGET_BIN} arg1 arg2 arg3
 
-ckpt.img1: ${KERNEL_LOADER_BIN} ${TARGET_BIN} ${TARGET_PRELOAD_LIB} disableASLR
-	UH_PRELOAD=$$PWD/${TARGET_PRELOAD_LIB} TARGET_LD=${RTLD_PATH} ADDR_BEGIN=117440512 ADDR_SPACE_SIZE=8192 ./$< $$PWD/${TARGET_BIN} arg1 arg2 arg3
-ckpt.img2: ${KERNEL_LOADER_BIN} ${TARGET_BIN} ${TARGET_PRELOAD_LIB} disableASLR
-	UH_PRELOAD=$$PWD/${TARGET_PRELOAD_LIB} TARGET_LD=${RTLD_PATH} ADDR_BEGIN=117440512 ADDR_SIZE=819200 ./$< $$PWD/${TARGET_BIN} arg1 arg2 arg3
+
+ckpt.rank1: ${KERNEL_LOADER_BIN} ${TARGET_BIN} ${TARGET_PRELOAD_LIB} disableASLR
+	UH_PRELOAD=$$PWD/${TARGET_PRELOAD_LIB} TARGET_LD=${RTLD_PATH} RANK_ID=1 ./$< $$PWD/${TARGET_BIN} arg1 arg2 arg3
+ckpt.rank2: ${KERNEL_LOADER_BIN} ${TARGET_BIN} ${TARGET_PRELOAD_LIB} disableASLR
+	UH_PRELOAD=$$PWD/${TARGET_PRELOAD_LIB} TARGET_LD=${RTLD_PATH} RANK_ID=2 ./$< $$PWD/${TARGET_BIN} arg1 arg2 arg3
+
+gdb.rank1: ${KERNEL_LOADER_BIN} ${TARGET_BIN} ${TARGET_PRELOAD_LIB} disableASLR
+	UH_PRELOAD=$$PWD/${TARGET_PRELOAD_LIB} TARGET_LD=${RTLD_PATH} RANK_ID=1 gdb --args ./$< $$PWD/${TARGET_BIN} arg1 arg2 arg3
+
 
 run: ${KERNEL_LOADER_BIN} ${TARGET_BIN} ${TARGET_PRELOAD_LIB} disableASLR
 	UH_PRELOAD=$$PWD/${TARGET_PRELOAD_LIB} TARGET_LD=${RTLD_PATH} ./$< $$PWD/${TARGET_BIN} arg1 arg2 arg3
@@ -35,15 +40,19 @@ run: ${KERNEL_LOADER_BIN} ${TARGET_BIN} ${TARGET_PRELOAD_LIB} disableASLR
 gdb: ${KERNEL_LOADER_BIN} ${TARGET_BIN} ${TARGET_PRELOAD_LIB}
 	UH_PRELOAD=$$PWD/${TARGET_PRELOAD_LIB} TARGET_LD=${RTLD_PATH} gdb --args ./$< $$PWD/${TARGET_BIN} arg1 arg2 arg3
 
-gdb2: ${KERNEL_LOADER_BIN} ${TARGET_BIN} ${TARGET_PRELOAD_LIB}
-	UH_PRELOAD=$$PWD/${TARGET_PRELOAD_LIB} TARGET_LD=${RTLD_PATH} ADDR_BEGIN=117440512 ADDR_SPACE_SIZE=819200 gdb --args ./$< $$PWD/${TARGET_BIN} arg1 arg2 arg3
-
 restart: ${KERNEL_LOADER_BIN} ckpt.img
 	UH_PRELOAD=$$PWD/${TARGET_PRELOAD_LIB} TARGET_LD=${RTLD_PATH} ./$< --restore ./ckpt.img
 	echo 2 | sudo tee /proc/sys/kernel/randomize_va_space
 
 restart-simgrid: ${SIMGRID_BIN} ckpt.img
 	UH_PRELOAD=$$PWD/${TARGET_PRELOAD_LIB} TARGET_LD=${RTLD_PATH} ./$< --restore ./ckpt.img
+
+gdb-restart: ${SIMGRID_BIN} rank_1_ckpt.img
+	UH_PRELOAD=$$PWD/${TARGET_PRELOAD_LIB} TARGET_LD=${RTLD_PATH} gdb --args ./$< --restore ./rank_1_ckpt.img
+
+restart-simgrid-2-ranks: ${SIMGRID_BIN} rank_1_ckpt.img rank_2_ckpt.img
+	UH_PRELOAD=$$PWD/${TARGET_PRELOAD_LIB} TARGET_LD=${RTLD_PATH} ./$< --restore ./rank_1_ckpt.img ./rank_2_ckpt.img
+
 
 disableASLR:
 	@- [ `cat /proc/sys/kernel/randomize_va_space` == 0 ] || sudo sh -c 'echo 0 > /proc/sys/kernel/randomize_va_space'

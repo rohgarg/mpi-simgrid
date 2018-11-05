@@ -556,54 +556,6 @@ confine_addr_space(int rank_ID) {
   return;
 }
 
-// static void
-// confine_addr_space(char* addr_space_begin, unsigned long size) {
-//   void* addr;
-//   size_t map_size;
-//   int prot = PROT_NONE;
-//   int flags = MAP_FIXED | MAP_ANONYMOUS | MAP_PRIVATE;
-// 
-//   // extend the heap to reach 'addr_space_begin
-//   struct rlimit rlimit_ = {.rlim_cur = RLIM_INFINITY, .rlim_max = RLIM_INFINITY};
-//   if (setrlimit(RLIMIT_DATA, &rlimit_) != 0) {
-//     perror("setrlimit()");
-//     exit(1);
-//   }
-//   brk(addr_space_begin);
-//   sbrk(0);
-// 
-//   // 'addr_space_begin+size' - vvar
-//   Area vvar;
-//   getVvarRegion(&vvar);
-//   addr = (void*)(addr_space_begin + size);
-//   map_size = (vvar.addr - (char*)addr);
-//   if (mmap(addr, map_size, prot, flags, -1, 0) == MAP_FAILED) {
-//     perror("mmap()");
-//     exit(1);
-//   }
-//   // vvar - vdso
-//   Area vdso;
-//   getVdsoRegion(&vdso);
-//   addr = (void*)vvar.endAddr;
-//   map_size = (vdso.addr - vvar.endAddr);
-//   if (map_size > 0) {
-//     if (mmap(addr, map_size, prot, flags, -1, 0) == MAP_FAILED) {
-//       perror("mmap()");
-//       exit(1);
-//     }
-//   }
-//   // vdso - stack
-//   Area stack;
-//   getStackRegion(&stack);
-//   addr = (void*)vdso.endAddr;
-//   map_size = (stack.addr - vdso.endAddr) - (4096 * 10);
-//   if (mmap(addr, map_size, prot, flags, -1, 0) == MAP_FAILED) {
-//     perror("mmap()");
-//     exit(1);
-//   }
-// 
-//   return;
-// }
 
 // Returns the 'vvar' area by reading the proc maps
 static void

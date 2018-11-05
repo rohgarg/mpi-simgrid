@@ -47,10 +47,10 @@ restart: ${KERNEL_LOADER_BIN} ckpt.img
 restart-simgrid: ${SIMGRID_BIN} ckpt.img
 	UH_PRELOAD=$$PWD/${TARGET_PRELOAD_LIB} TARGET_LD=${RTLD_PATH} ./$< --restore ./ckpt.img
 
-gdb-restart: ${SIMGRID_BIN} rank_1_ckpt.img
+gdb-restart: ${SIMGRID_BIN} rank_1_ckpt.img disableASLR
 	UH_PRELOAD=$$PWD/${TARGET_PRELOAD_LIB} TARGET_LD=${RTLD_PATH} gdb --args ./$< --restore ./rank_1_ckpt.img
 
-restart-simgrid-2-ranks: ${SIMGRID_BIN} rank_1_ckpt.img rank_2_ckpt.img
+restart-simgrid-2-ranks: ${SIMGRID_BIN} rank_1_ckpt.img rank_2_ckpt.img disableASLR
 	UH_PRELOAD=$$PWD/${TARGET_PRELOAD_LIB} TARGET_LD=${RTLD_PATH} ./$< --restore ./rank_1_ckpt.img ./rank_2_ckpt.img
 
 

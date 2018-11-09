@@ -64,9 +64,10 @@ runRtld()
   char *ldname  = getenv("TARGET_LD");
   char *uhpreload = getenv("UH_PRELOAD");
   
+  // FIXME: we're using "RANK_ID" env. variable, this must change in 
+  //        production. 
   int rank_ID = atoi(getenv("RANK_ID"));
 
-  // FIXME: find dynamically the 'page size'
   confine_addr_space(rank_ID);
 
   // printf("ADDR_BEGIN: %p\n", (char*)start_addr);
@@ -507,33 +508,31 @@ setupLowerHalfInfo()
   return 0;
 }
 
+// confine the addr. space in which a rank runs.
 static void
 confine_addr_space(int rank_ID) {
+  long PAGE_SZ;
   void* addr;
   size_t map_size;
   int prot = PROT_NONE;
   int flags = MAP_FIXED | MAP_ANONYMOUS | MAP_PRIVATE;
 
-  unsigned long _4GB;
-  void* addr_space_begin; // the
+  void* addr_space_begin;                    // the confined addr. space
+  unsigned long addr_space_size;             // 4GB
 
 
-  _4GB = (unsigned long)1 << 32;
+  addr_space_size = (unsigned long)1 << 32;
+  assert((PAGE_SZ = sysconf(_SC_PAGESIZE)) != -1);
+  addr_space_begin = (void*)(addr_space_size + rank_ID * addr_space_size);
+  
+  assert((addr = sbrk(PAGE_SZ)) != (void*)-1); // 1 PAGE away from the heap
+  map_size = addr_space_begin - addr;
+  assert(mmap(addr, map_size, prot, flags, -1, 0) != MAP_FAILED);
 
-  // confine "kernel loader" within the bottom 4GB
-  // TODO: should we move the stack to reside in the bottom 4GB?
-  //       at this point I don't see any reason in doing so.
-  addr_space_begin = (void*)(_4GB + rank_ID * _4GB);
-  struct rlimit rlim = {.rlim_cur = RLIM_INFINITY, .rlim_max = RLIM_INFINITY};
-  assert(setrlimit(RLIMIT_DATA, &rlim) == 0);
-  // FIXME: "malloc()" is somehow aware that there is an unused huge chunk of memory.
-  //        and 'sbrk()' has no clue.
-  assert(brk((void*)addr_space_begin) == 0);
-
-  // Book region ['address_space_begin + _4GB' - 'beginning of vvar']
+  // Book region ['address_space_begin + addr_space_size' - 'beginning of vvar']
   Area vvar;
   getVvarRegion(&vvar);
-  addr = (void*)((char*)addr_space_begin + _4GB);
+  addr = (void*)((char*)addr_space_begin + addr_space_size);
   map_size = (vvar.addr - (char*)addr);
   assert(mmap(addr, map_size, prot, flags, -1, 0) != MAP_FAILED);
 

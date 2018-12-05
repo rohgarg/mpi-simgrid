@@ -222,7 +222,7 @@ map_elf_interpreter_load_segment(int fd, Elf64_Phdr phdr, void *ld_so_addr)
   //         and then unmap the unused portions later after all the
   //         LOAD segments are mapped.  This is what ld.so would do.
 
-  rc2 = mmapWrapper((void *)addr, size, prot, MAP_PRIVATE, fd, offset);
+  rc2 = mmapWrapper((void *)addr, size, prot, flags, fd, offset);
   if (rc2 == MAP_FAILED) {
     DLOG(ERROR, "Failed to map memory region at %p. Error:%s\n",
          (void*)addr, strerror(errno));

@@ -7,9 +7,9 @@
 #define ELF_DEBUGLINK_SECT   ".gnu_debuglink"
 
 // FIXME: Find this path at runtime?
-#ifdef UBUNTU
+// #ifdef UBUNTU
 #define DEBUG_FILES_PATH "/usr/lib/debug/lib/x86_64-linux-gnu"
-#endif // ifdef UBUNTU
+// #endif // ifdef UBUNTU
 
 int insertTrampoline(void* , void* );
 off_t get_symbol_offset(const char* , const char* );

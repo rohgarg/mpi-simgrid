@@ -101,6 +101,7 @@ clean: tidy
 	rm -f ${KERNEL_LOADER_OBJS} ${TARGET_OBJS} ${KERNEL_LOADER_BIN} \
 	      ${TARGET_BIN} ${TARGET_PRELOAD_LIB_OBJS} ${TARGET_PRELOAD_LIB} \
 				${SIMGRID_BIN} ${STATIC_TARGET_BIN_RANK0} ${STATIC_TARGET_BIN_RANK1} \
+				${FILE}-simgrid.o \
 		  GTAGS GRTAGS GPATH
 
 .PHONY: dist vi vim clean gdb tags tidy restart run run0 enableASLR disableASLR restart-simgrid

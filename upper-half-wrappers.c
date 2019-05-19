@@ -9,6 +9,7 @@
 #include <sys/types.h>
 
 #include "common.h"
+#include "mtcp_sys.h"
 #include "upper-half-wrappers.h"
 
 int initialized = 0;
@@ -69,19 +70,20 @@ reset_wrappers()
 static void
 readLhInfoAddr()
 {
-  int fd = open(LH_FILE_NAME, O_RDONLY);
+  int mtcp_sys_errno;
+  int fd = mtcp_sys_open2(LH_FILE_NAME, O_RDONLY);
   if (fd < 0) {
     DLOG(ERROR, "Could not open addr.bin for reading. Error: %s",
-         strerror(errno));
+         strerror(mtcp_sys_errno));
     exit(-1);
   }
 
-  int rc = read(fd, &lhInfo, sizeof(lhInfo));
+  int rc = mtcp_sys_read(fd, &lhInfo, sizeof(lhInfo));
   if (rc < sizeof(lhInfo)) {
     DLOG(ERROR, "Read fewer bytes than expected from addr.bin. Error: %s",
-         strerror(errno));
+         strerror(mtcp_sys_errno));
     exit(-1);
   }
-  unlink(LH_FILE_NAME);
-  close(fd);
+  mtcp_sys_unlink(LH_FILE_NAME);
+  mtcp_sys_close(fd);
 }

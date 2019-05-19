@@ -124,12 +124,12 @@ extern LowerHalfInfo_t lhInfo;
     MACRO(Send) \
     MACRO(Recv) \
 
-#define GENERATE_ENUM(ENUM) MPI_Fnc_##ENUM,
+#define GENERATE_ENUM_KL(ENUM) MPI_Fnc_##ENUM,
 #define GENERATE_FNC_PTR(FNC) &MPI_##FNC,
 
 typedef enum __MPI_Fncs {
   MPI_Fnc_NULL,
-  FOREACH_FNC(GENERATE_ENUM)
+  FOREACH_FNC(GENERATE_ENUM_KL)
   MPI_Fnc_Invalid,
 } MPI_Fncs_t;
 

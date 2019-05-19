@@ -88,8 +88,13 @@ __mmapWrapper(void *addr, size_t length, int prot,
     if (fd > 0) {
       char glibcFullPath[PATH_MAX] = {0};
       int found = checkLibrary(fd, "libc-", glibcFullPath, PATH_MAX);
-      if (found && (prot & PROT_EXEC)) {
-        patchLibc(fd, ret, glibcFullPath);
+      static void* libcBase = NULL;
+      if (found && !libcBase && (prot & PROT_READ)) {
+        libcBase = ret;
+      } else if (found && !libcBase && (prot & PROT_EXEC)) {
+        patchLibc(fd, libcBase, glibcFullPath);
+      } else if (found && libcBase && (prot & PROT_EXEC)) {
+        patchLibc(fd, libcBase, glibcFullPath);
       }
     }
   }

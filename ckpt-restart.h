@@ -28,7 +28,7 @@ typedef enum __CkptOrRestore
 CkptOrRestore_t doCheckpoint() __attribute__((weak));
 #define doCheckpoint() (doCheckpoint ? doCheckpoint() : 0)
 
-int restoreCheckpoint(const char **);
+int restoreCheckpoint(const char *);
 
 // Returns true if needle is in the haystack
 static inline int

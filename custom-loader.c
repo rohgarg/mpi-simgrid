@@ -65,11 +65,14 @@ safeLoadLib(const char *name)
     goto end;
   }
 
-  info.mmapAddr = (VA)info.baseAddr + mmapOffset;
-  info.sbrkAddr = (VA)info.baseAddr + sbrkOffset;
+  // info.mmapAddr = (VA)info.baseAddr + mmapOffset;
+  // info.sbrkAddr = (VA)info.baseAddr + sbrkOffset;
+  info.mmapAddr = (VA) mmapOffset;
+  info.sbrkAddr = (VA) sbrkOffset;
 
 end:
-  info.entryPoint = (void*)((uintptr_t)info.baseAddr + (uintptr_t)ld_so_entry);
+  // info.entryPoint = (void*)((uintptr_t)info.baseAddr + (uintptr_t)ld_so_entry);
+  info.entryPoint = (void*)(ld_so_entry);
   return info;
 }
 
@@ -183,24 +186,12 @@ map_elf_interpreter_load_segment(int fd, Elf64_Phdr phdr, void *ld_so_addr)
   unsigned long addr;
 
   // FIXME: this part should be fused in the whole function.
-  if (first_time) {
-    int rank_ID = atoi(getenv("RANK_ID"));
-    unsigned long _4GB = (unsigned long)1 << 32;
-    off_t ld_so_offset = (3 * _4GB) / 4;
-    // read "confine_addr_space.org" in DOC for more info.
-    base_address = (char*)(_4GB + _4GB * rank_ID + ld_so_offset);
-    flags |= MAP_FIXED;
+
+  if (phdr.p_paddr) {
+    addr = ROUND_DOWN(phdr.p_paddr);
+  } else {
+    addr = ROUND_DOWN(base_address + vaddr);
   }
-
-//   if (first_time) {
-//     // FIXME: I'm being lazy puting 'ld.so' 
-//     //        in the middle of the allotted address space
-//     addr = ROUND_DOWN(addr_space_begin + (addr_space_size/2) + vaddr);
-//   } else {
-//     addr = ROUND_DOWN(base_address + vaddr);
-//   }
-
-  addr = ROUND_DOWN(base_address + vaddr);
 
   size_t size = ROUND_UP(phdr.p_filesz + PAGE_OFFSET(phdr.p_vaddr));
   off_t offset = phdr.p_offset - PAGE_OFFSET(phdr.p_vaddr);
@@ -231,6 +222,10 @@ map_elf_interpreter_load_segment(int fd, Elf64_Phdr phdr, void *ld_so_addr)
   unsigned long startBss = (uintptr_t)base_address +
                           phdr.p_vaddr + phdr.p_filesz;
   unsigned long endBss = (uintptr_t)base_address + phdr.p_vaddr + phdr.p_memsz;
+  if (phdr.p_paddr) {
+    startBss = phdr.p_paddr + phdr.p_filesz;
+    endBss = phdr.p_paddr + phdr.p_memsz;
+  }
   // Required by ELF Format:
   if (phdr.p_memsz > phdr.p_filesz) {
     // This condition is true for the RW (data) segment of ld.so

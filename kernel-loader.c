@@ -17,6 +17,8 @@
 #include <sys/time.h>
 #include <sys/resource.h>
 
+#include <mpi.h>
+
 #include "common.h"
 #include "ckpt-restart.h"
 #include "custom-loader.h"
@@ -35,8 +37,8 @@ static void getStackRegion(Area *);
 static void* deepCopyStack(void *, const void *, size_t,
                            const void *, const void*,
                            const DynObjInfo_t *);
-static void* createNewStackForRtld(const DynObjInfo_t *);
-static void* createNewHeapForRtld(const DynObjInfo_t *);
+static void* createNewStackForRtld(const DynObjInfo_t *, void *);
+static void* createNewHeapForRtld(const DynObjInfo_t *, void *);
 static void* getEntryPoint(DynObjInfo_t );
 static void patchAuxv(ElfW(auxv_t) *, unsigned long ,
                       unsigned long , unsigned long );
@@ -44,9 +46,11 @@ static int writeLhInfoToFile();
 static int setupLowerHalfInfo();
 static void printUsage();
 static void printRestartUsage();
+#if 0
 static void confine_addr_space(int);
 static void getVvarRegion(Area*);
 static void getVdsoRegion(Area*);
+#endif
 
 // Global functions
 
@@ -61,20 +65,27 @@ runRtld()
   void *ldso_entrypoint = NULL;
 
   // Load RTLD (ld.so)
-  char *ldname  = getenv("TARGET_LD");
+  char *ldname  = getenv("TARGET_EXE");
   char *uhpreload = getenv("UH_PRELOAD");
+  char *heapA = getenv("RANK_HEAP");
+  char *stackA = getenv("RANK_STACK");
   
+#if 0
   // FIXME: we're using "RANK_ID" env. variable, this must change in 
   //        production. 
   int rank_ID = atoi(getenv("RANK_ID"));
 
   confine_addr_space(rank_ID);
+#endif
 
   // printf("ADDR_BEGIN: %p\n", (char*)start_addr);
-  if (!ldname || !uhpreload) {
+  if (!ldname || !uhpreload || !heapA || !stackA) {
     printUsage();
     return -1;
   }
+
+  void *heapAddr = (void*) strtol(heapA, NULL, 0);
+  void *stackAddr = (void*) strtol(stackA, NULL, 0);
 
   DynObjInfo_t ldso = safeLoadLib(ldname);
   if (ldso.baseAddr == NULL || ldso.entryPoint == NULL) {
@@ -86,7 +97,7 @@ runRtld()
   ldso_entrypoint = getEntryPoint(ldso);
 
   // Create new stack region to be used by RTLD
-  void *newStack = createNewStackForRtld(&ldso);
+  void *newStack = createNewStackForRtld(&ldso, stackAddr);
   if (!newStack) {
     DLOG(ERROR, "Error creating new stack for RTLD. Exiting...\n");
     return -1;
@@ -94,7 +105,7 @@ runRtld()
   DLOG(INFO, "New stack start at: %p\n", newStack);
 
   // Create new heap region to be used by RTLD
-  void *newHeap = createNewHeapForRtld(&ldso);
+  void *newHeap = createNewHeapForRtld(&ldso, heapAddr);
   if (!newHeap) {
     DLOG(ERROR, "Error creating new heap for RTLD. Exiting...\n");
     return -1;
@@ -146,7 +157,10 @@ main(int argc, char **argv)
       DLOG(ERROR, "Failed to set up lhinfo for the upper half. Exiting...\n");
       exit(-1);
     }
-    return restoreCheckpoint((const char**)&argv[2]);
+    int rank = -1;
+    rc = MPI_Init(&argc, &argv);
+    rc = MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    return restoreCheckpoint(argv[rank + 2]);
   }
   return runRtld();
 }
@@ -158,8 +172,8 @@ static void
 printUsage()
 {
   DLOG(ERROR, "Usage: UH_PRELOAD=/path/to/libupperhalfwrappers.so "
-          "TARGET_LD=/path/to/ld.so ./kernel-loader "
-          "<target-application> [application arguments ...]\n");
+          "TARGET_EXE=/path/to/target.exe RANK_ID=<mpi-rank> ./kernel-loader "
+          "[application arguments ...]\n");
 }
 
 static void
@@ -252,8 +266,8 @@ deepCopyStack(void *newStack, const void *origStack, size_t len,
               const DynObjInfo_t *info)
 {
   // This function assumes that this env var is set.
-  assert(getenv("TARGET_LD"));
-  assert(getenv("UH_PRELOAD"));
+  assert(getenv("TARGET_EXE") != NULL);
+  assert(getenv("UH_PRELOAD") != NULL);
 
   // Return early if any pointer is NULL
   if (!newStack || !origStack ||
@@ -335,7 +349,7 @@ deepCopyStack(void *newStack, const void *origStack, size_t len,
   //   had the correct value for origArgc. We just make argv[0] in the
   //   new stack to point to "/path/to/ld.so", instead of
   //   "/path/to/kernel-loader".
-  off_t argvDelta = (uintptr_t)getenv("TARGET_LD") - (uintptr_t)origArgv;
+  off_t argvDelta = (uintptr_t)getenv("TARGET_EXE") - (uintptr_t)origArgv;
   newArgv[0] = (char*)((uintptr_t)newArgv + (uintptr_t)argvDelta);
 
   // Patch the env vector in the new stack
@@ -376,7 +390,7 @@ deepCopyStack(void *newStack, const void *origStack, size_t len,
 //  2. Deep copies the original stack (from the kernel) in the new stack region
 //  3. Returns a pointer to the beginning of stack in the new stack region
 static void*
-createNewStackForRtld(const DynObjInfo_t *info)
+createNewStackForRtld(const DynObjInfo_t *info, void *stackAddr)
 {
   Area stack;
   char stackEndStr[20] = {0};
@@ -385,7 +399,7 @@ createNewStackForRtld(const DynObjInfo_t *info)
   // 1. Allocate new stack region
   // We go through the mmap wrapper function to ensure that this gets added
   // to the list of upper half regions to be checkpointed.
-  void *newStack = mmapWrapper(NULL, stack.size, PROT_READ | PROT_WRITE,
+  void *newStack = mmapWrapper(stackAddr, stack.size, PROT_READ | PROT_WRITE,
                                MAP_GROWSDOWN | MAP_PRIVATE | MAP_ANONYMOUS,
                                -1, 0);
   if (newStack == MAP_FAILED) {
@@ -435,11 +449,11 @@ createNewStackForRtld(const DynObjInfo_t *info)
 // Returns the start address of the new heap on success, or NULL on
 // failure.
 static void*
-createNewHeapForRtld(const DynObjInfo_t *info)
+createNewHeapForRtld(const DynObjInfo_t *info, void *heapAddr)
 {
   // We go through the mmap wrapper function to ensure that this gets added
   // to the list of upper half regions to be checkpointed.
-  void *addr = mmapWrapper(0, 100*PAGE_SIZE, PROT_READ | PROT_WRITE,
+  void *addr = mmapWrapper(heapAddr, 100*PAGE_SIZE, PROT_READ | PROT_WRITE,
                            MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
   if (addr == MAP_FAILED) {
     DLOG(ERROR, "Failed to mmap region. Error: %s\n",
@@ -508,6 +522,7 @@ setupLowerHalfInfo()
   return 0;
 }
 
+#if 0
 // confine the addr. space in which a rank runs.
 static void
 confine_addr_space(int rank_ID) {
@@ -585,3 +600,4 @@ getVdsoRegion(Area *vdso) // OUT
   }
   close(mapsfd);
 }
+#endif

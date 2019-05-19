@@ -25,56 +25,20 @@ static int restoreMemoryRegion(int , const Area* );
 static void* startRank(void* );
 static int restoreMemoryForImage(const char* , CkptRestartState_t* );
 static int anyOverlappingRegion(const Area* );
-static int getNumRanks(const char **ckptImgs);
-static int restoreMemoryForImages(const char** , CkptRestartState_t** , int );
 
 int
-restoreCheckpoint(const char **ckptImgs)
+restoreCheckpoint(const char *ckptImg)
 {
   int rc = 0;
-  int noRanks = getNumRanks(ckptImgs);
-  assert(noRanks > 0);
 
-  CkptRestartState_t **ctxs = calloc(noRanks, sizeof(CkptRestartState_t*));
-  rc = restoreMemoryForImages(ckptImgs, ctxs, noRanks);
+  CkptRestartState_t *ctx = calloc(1, sizeof(CkptRestartState_t));
+  rc = restoreMemoryForImage(ckptImg, ctx);
   if (rc < 0) {
-    DLOG(ERROR, "Failed to restore MPI ranks. Exiting...\n");
+    DLOG(ERROR, "Failed to restore img: %s. Exiting...\n", ckptImg);
     return rc;
   }
-  pthread_t ths[noRanks];
-  for (int i = 0; i < noRanks; i++) {
-    pthread_create(&ths[i], NULL, startRank, (void*)ctxs[i]);
-  }
-  for (int i = 0; i < noRanks; i++) {
-    pthread_join(ths[i], NULL);
-  }
+  startRank((void*)ctx);
   return rc;
-}
-
-static int
-getNumRanks(const char **ckptImgs)
-{
-  int noRanks = 0;
-  const char **c = ckptImgs;
-  while (*c++) {
-    noRanks++;
-  }
-  return noRanks;
-}
-
-static int
-restoreMemoryForImages(const char **ckptImgs, CkptRestartState_t **ctxs, int noRanks)
-{
-  int rc;
-  for (int i = 0; i < noRanks; i++) {
-    ctxs[i] = calloc(1, sizeof **ctxs);
-    rc = restoreMemoryForImage(ckptImgs[i], ctxs[i]);
-    if (rc < 0) {
-      DLOG(ERROR, "Failed to restore img: %s\n", ckptImgs[i]);
-      return -1;
-    }
-  }
-  return 0;
 }
 
 static int

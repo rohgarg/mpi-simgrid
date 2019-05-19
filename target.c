@@ -15,8 +15,10 @@ main(int argc, char **argv)
 
   processArgs(argc, (const char**)argv);
 
+  int rank = -1;
   int rc = MPI_Init(&argc, &argv);
   printf("App: MPI_Init returned: %d\n", rc);
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
   while (i < 2) {
     printf("%d ", i);
@@ -31,9 +33,13 @@ main(int argc, char **argv)
     printf("App: Resuming after ckpt...\n");
   } else if (ret == POST_RESTART) {
     printf("App: Restarting from a ckpt...\n");
-    printf("App: Calling MPI_Init after restart...\n");
-    rc = MPI_Init(&argc, &argv);
-    printf("App: MPI_Init returned: %d\n", rc);
+    int buf = 17;
+    if (rank == 0) {
+      MPI_Send(&buf, 1, MPI_INT, 1, 0, MPI_COMM_WORLD);
+    } else if (rank == 1) {
+      MPI_Status status;
+      MPI_Recv(&buf, 1, MPI_INT, 0, 0, MPI_COMM_WORLD, &status);
+    }
   }
 
   while (i < 4) {

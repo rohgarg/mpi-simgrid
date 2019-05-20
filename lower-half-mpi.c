@@ -21,7 +21,11 @@
 static MPI_Comm virtual_to_real_comm(MPI_Comm );
 static MPI_Datatype virtual_to_real_type(MPI_Datatype );
 
-DEFINE_FNC(int, Init, (int *) argc, (char ***) argv)
+int
+__MPI_Init(int *argc, char ***argv)
+{
+  return MPI_SUCCESS;
+}
 
 // DEFINE_FNC(int, Comm_rank, (MPI_Comm) comm, (int *) world_rank)
 int

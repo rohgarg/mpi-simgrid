@@ -46,18 +46,15 @@ static int writeLhInfoToFile();
 static int setupLowerHalfInfo();
 static void printUsage();
 static void printRestartUsage();
-#if 0
-static void confine_addr_space(int);
-static void getVvarRegion(Area*);
-static void getVdsoRegion(Area*);
-#endif
+static uintptr_t getHeapAddr(int rank);
+static uintptr_t getStackAddr(int rank);
 
 // Global functions
 
 // This function loads in ld.so, sets up a separate stack for it, and jumps
 // to the entry point of ld.so
 int
-runRtld()
+runRtld(int argc, char **argv)
 {
   int rc = -1;
 
@@ -66,30 +63,28 @@ runRtld()
 
   // Load RTLD (ld.so)
   char *ldname  = getenv("TARGET_EXE");
-  char *uhpreload = getenv("UH_PRELOAD");
-  char *heapA = getenv("RANK_HEAP");
-  char *stackA = getenv("RANK_STACK");
   
-#if 0
-  // FIXME: we're using "RANK_ID" env. variable, this must change in 
-  //        production. 
-  int rank_ID = atoi(getenv("RANK_ID"));
-
-  confine_addr_space(rank_ID);
-#endif
-
-  // printf("ADDR_BEGIN: %p\n", (char*)start_addr);
-  if (!ldname || !uhpreload || !heapA || !stackA) {
+  if (!ldname) {
     printUsage();
     return -1;
   }
 
-  void *heapAddr = (void*) strtol(heapA, NULL, 0);
-  void *stackAddr = (void*) strtol(stackA, NULL, 0);
+  int rank = -1;
+  rc = MPI_Init(&argc, &argv);
+  rc = MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  if (rc != MPI_SUCCESS) {
+    DLOG(ERROR, "Failed to initialize MPI. Exiting...\n");
+    return -1;
+  }
+  void *heapAddr = (void*)getHeapAddr(rank);
+  void *stackAddr = (void*)getStackAddr(rank);
+  lhInfo.rank = rank;
+  char exeName[100] = {0};
+  snprintf(exeName, 100, "%s-rank%d.exe", ldname, rank);
 
-  DynObjInfo_t ldso = safeLoadLib(ldname);
+  DynObjInfo_t ldso = safeLoadLib(exeName);
   if (ldso.baseAddr == NULL || ldso.entryPoint == NULL) {
-    DLOG(ERROR, "Error loading the runtime loader (%s). Exiting...\n", ldname);
+    DLOG(ERROR, "Error loading the runtime loader (%s). Exiting...\n", exeName);
     return -1;
   }
 
@@ -162,7 +157,7 @@ main(int argc, char **argv)
     rc = MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     return restoreCheckpoint(argv[rank + 2]);
   }
-  return runRtld();
+  return runRtld(argc, argv);
 }
 #endif
 
@@ -171,8 +166,7 @@ main(int argc, char **argv)
 static void
 printUsage()
 {
-  DLOG(ERROR, "Usage: UH_PRELOAD=/path/to/libupperhalfwrappers.so "
-          "TARGET_EXE=/path/to/target.exe RANK_ID=<mpi-rank> ./kernel-loader "
+  DLOG(ERROR, "Usage: TARGET_EXE=/path/to/target.exe ./kernel-loader "
           "[application arguments ...]\n");
 }
 
@@ -267,7 +261,7 @@ deepCopyStack(void *newStack, const void *origStack, size_t len,
 {
   // This function assumes that this env var is set.
   assert(getenv("TARGET_EXE") != NULL);
-  assert(getenv("UH_PRELOAD") != NULL);
+  // assert(getenv("UH_PRELOAD") != NULL);
 
   // Return early if any pointer is NULL
   if (!newStack || !origStack ||
@@ -358,6 +352,7 @@ deepCopyStack(void *newStack, const void *origStack, size_t len,
     newEnv[i] = (char*)((uintptr_t)newEnv + (uintptr_t)envDelta);
   }
 
+#if 0
   // Change "UH_PRELOAD" to "LD_PRELOAD". This way, upper half's ld.so
   // will preload the upper half wrapper library.
   char **newEnvPtr = (char**)newEnv;
@@ -368,6 +363,7 @@ deepCopyStack(void *newStack, const void *origStack, size_t len,
       break;
     }
   }
+#endif
 
   // The aux vector, which we would have inherited from the original stack,
   // has entries that correspond to the kernel loader binary. In particular,
@@ -522,82 +518,16 @@ setupLowerHalfInfo()
   return 0;
 }
 
-#if 0
-// confine the addr. space in which a rank runs.
-static void
-confine_addr_space(int rank_ID) {
-  long PAGE_SZ;
-  void* addr;
-  size_t map_size;
-  int prot = PROT_NONE;
-  int flags = MAP_FIXED | MAP_ANONYMOUS | MAP_PRIVATE;
-
-  void* addr_space_begin;                    // the confined addr. space
-  unsigned long addr_space_size;             // 4GB
-
-
-  addr_space_size = (unsigned long)1 << 32;
-  assert((PAGE_SZ = sysconf(_SC_PAGESIZE)) != -1);
-  addr_space_begin = (void*)(addr_space_size + rank_ID * addr_space_size);
-  
-  assert((addr = sbrk(PAGE_SZ)) != (void*)-1); // 1 PAGE away from the heap
-  map_size = addr_space_begin - addr;
-  assert(mmap(addr, map_size, prot, flags, -1, 0) != MAP_FAILED);
-
-  // Book region ['address_space_begin + addr_space_size' - 'beginning of vvar']
-  Area vvar;
-  getVvarRegion(&vvar);
-  addr = (void*)((char*)addr_space_begin + addr_space_size);
-  map_size = (vvar.addr - (char*)addr);
-  assert(mmap(addr, map_size, prot, flags, -1, 0) != MAP_FAILED);
-
-  // Book region ['end of vvar' - 'beginning of vdso']
-  Area vdso;
-  getVdsoRegion(&vdso);
-  addr = (void*)vvar.endAddr;
-  map_size = (vdso.addr - (char*)addr);
-  if (map_size > 0) {
-    assert(mmap(addr, map_size, prot, flags, -1, 0) != MAP_FAILED);
-  }
-
-  // Book region ['end of vdso' - 'beginning of stack']
-  Area stack;
-  getStackRegion(&stack);
-  addr = (void*)vdso.endAddr;
-  map_size = (stack.addr - vdso.endAddr);
-  assert(mmap(addr, map_size, prot, flags, -1, 0) != MAP_FAILED);
-
-  return;
-}
-
-
-// Returns the 'vvar' area by reading the proc maps
-static void
-getVvarRegion(Area *vvar) // OUT
+static uintptr_t
+getHeapAddr(int rank)
 {
-  Area area;
-  int mapsfd = open("/proc/self/maps", O_RDONLY);
-  while (readMapsLine(mapsfd, &area)) {
-    if (strstr(area.name, "[vvar]")) {
-      *vvar = area;
-      break;
-    }
-  }
-  close(mapsfd);
+  // FIXME: This only works for two ranks
+  return rank * 0x10000000 + 0xA0000000;
 }
 
-// Returns the 'vdso' area by reading the proc maps
-static void
-getVdsoRegion(Area *vdso) // OUT
+static uintptr_t
+getStackAddr(int rank)
 {
-  Area area;
-  int mapsfd = open("/proc/self/maps", O_RDONLY);
-  while (readMapsLine(mapsfd, &area)) {
-    if (strstr(area.name, "[vdso]")) {
-      *vdso = area;
-      break;
-    }
-  }
-  close(mapsfd);
+  // FIXME: This only works for two ranks
+  return rank * 0x10000000 + 0xC0000000;
 }
-#endif

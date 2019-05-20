@@ -81,6 +81,7 @@ typedef struct __LowerHalfInfo
   void *lhDlsym;
   unsigned long lhFsAddr;
   void *lhMmapListFptr;
+  int rank;
 } LowerHalfInfo_t;
 
 typedef struct __MmapInfo

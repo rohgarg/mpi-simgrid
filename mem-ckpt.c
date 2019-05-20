@@ -51,14 +51,9 @@ installCkptHandler()
   }
 
   static char ckpt_img[1024];
-  memcpy(ckpt_img, "./rank_", strlen("./rank_"));
-  char* rank_ID;
-  assert((rank_ID = getenv("RANK_ID")) != NULL);
-  memcpy(ckpt_img+strlen("./rank_"), rank_ID, 1);
-  memcpy(ckpt_img+strlen("./rank_x"), "_ckpt.img", sizeof("_ckpt.img"));
+  snprintf(ckpt_img, 1024, "./rank_%d_ckpt.img", lhInfo.rank);
   
   CKPT_IMG = ckpt_img;
-  // memcpy(CKPT_IMG, ckpt_img, strlen(ckpt_img));
   state = RUNNING;
 }
 

@@ -42,6 +42,7 @@ GET_AUXV_ADDR(const char **env)
 }
 
 int runRtld(int argc, char **argv);
+int patchLowerHalfInfo(const char *);
 void* sbrkWrapper(intptr_t );
 void* mmapWrapper(void *, size_t , int , int , int , off_t );
 void* getEndofHeap();

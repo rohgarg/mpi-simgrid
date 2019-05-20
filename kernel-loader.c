@@ -42,8 +42,7 @@ static void* createNewHeapForRtld(const DynObjInfo_t *, void *);
 static void* getEntryPoint(DynObjInfo_t );
 static void patchAuxv(ElfW(auxv_t) *, unsigned long ,
                       unsigned long , unsigned long );
-static int writeLhInfoToFile();
-static int setupLowerHalfInfo();
+static int setupLowerHalfInfo(int );
 static void printUsage();
 static void printRestartUsage();
 static uintptr_t getHeapAddr(int rank);
@@ -78,7 +77,6 @@ runRtld(int argc, char **argv)
   }
   void *heapAddr = (void*)getHeapAddr(rank);
   void *stackAddr = (void*)getStackAddr(rank);
-  lhInfo.rank = rank;
   char exeName[100] = {0};
   snprintf(exeName, 100, "%s-rank%d.exe", ldname, rank);
 
@@ -120,11 +118,12 @@ runRtld(int argc, char **argv)
 
   // Everything is ready, let's set up the lower-half info struct for the upper
   // half to read from
-  rc = setupLowerHalfInfo();
+  rc = setupLowerHalfInfo(rank);
   if (rc < 0) {
     DLOG(ERROR, "Failed to set up lhinfo for the upper half. Exiting...\n");
     return -1;
   }
+  patchLowerHalfInfo(exeName);
 
   // Change the stack pointer to point to the new stack and jump into ld.so
   // TODO: Clean up all the registers?
@@ -132,6 +131,17 @@ runRtld(int argc, char **argv)
                 : : "g" (newStack) : "memory");
   asm volatile ("jmp *%0" : : "g" (ldso_entrypoint) : "memory");
   return 0;
+}
+
+int
+patchLowerHalfInfo(const char *fname)
+{
+  if (fname) {
+    off_t lhInfoAddr = get_symbol_offset(fname, "lhInfo");
+    memcpy((void*)lhInfoAddr, &lhInfo, sizeof(lhInfo));
+    return 0;
+  }
+  return -1;
 }
 
 #ifdef STANDALONE
@@ -143,19 +153,19 @@ main(int argc, char **argv)
     return -1;
   }
   if (strstr(argv[1], "--restore")) {
-    if (argc < 3) {
+    if (!getenv("TARGET_EXE") || argc < 3) {
       printRestartUsage();
       return -1;
     }
-    int rc = setupLowerHalfInfo();
+    int rank = -1;
+    int rc = MPI_Init(&argc, &argv);
+    rc = MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    rc = setupLowerHalfInfo(rank);
     if (rc < 0) {
       DLOG(ERROR, "Failed to set up lhinfo for the upper half. Exiting...\n");
       exit(-1);
     }
-    int rank = -1;
-    rc = MPI_Init(&argc, &argv);
-    rc = MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    return restoreCheckpoint(argv[rank + 2]);
+    return restoreCheckpoint(rank, argv[rank + 2]);
   }
   return runRtld(argc, argv);
 }
@@ -470,33 +480,10 @@ getEntryPoint(DynObjInfo_t info)
   return info.entryPoint;
 }
 
-// Writes out the lhinfo global object to a file. Returns 0 on success,
-// -1 on failure.
-static int
-writeLhInfoToFile()
-{
-  int rc = 0;
-
-  int fd = open(LH_FILE_NAME, O_WRONLY | O_CREAT, 0644);
-  if (fd < 0) {
-    DLOG(ERROR, "Could not create addr.bin file. Error: %s", strerror(errno));
-    return -1;
-  }
-
-  rc = write(fd, &lhInfo, sizeof(lhInfo));
-  if (rc < sizeof(lhInfo)) {
-    DLOG(ERROR, "Wrote fewer bytes than expected to addr.bin. Error: %s",
-         strerror(errno));
-    rc = -1;
-  }
-  close(fd);
-  return rc;
-}
-
 // Sets up lower-half info struct for the upper half to read from. Returns 0
 // on success, -1 otherwise
 static int
-setupLowerHalfInfo()
+setupLowerHalfInfo(int rank)
 {
   lhInfo.lhSbrk = &sbrkWrapper;
   lhInfo.lhMmap = &mmapWrapper;
@@ -507,14 +494,7 @@ setupLowerHalfInfo()
          strerror(errno));
     return -1;
   }
-  // FIXME: We'll just write out the lhInfo object to a file; the upper half
-  // will read this file to figure out the wrapper addresses. This is ugly
-  // but will work for now.
-  int rc = writeLhInfoToFile();
-  if (rc < 0) {
-    DLOG(ERROR, "Error writing address of lhinfo to file. Exiting...\n");
-    return -1;
-  }
+  lhInfo.rank = rank;
   return 0;
 }
 

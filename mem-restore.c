@@ -27,7 +27,7 @@ static int restoreMemoryForImage(const char* , CkptRestartState_t* );
 static int anyOverlappingRegion(const Area* );
 
 int
-restoreCheckpoint(const char *ckptImg)
+restoreCheckpoint(int rank, const char *ckptImg)
 {
   int rc = 0;
 
@@ -37,6 +37,10 @@ restoreCheckpoint(const char *ckptImg)
     DLOG(ERROR, "Failed to restore img: %s. Exiting...\n", ckptImg);
     return rc;
   }
+  char *ldname  = getenv("TARGET_EXE");
+  char exeName[100] = {0};
+  snprintf(exeName, 100, "%s-rank%d.exe", ldname, rank);
+  patchLowerHalfInfo(exeName);
   startRank((void*)ctx);
   return rc;
 }

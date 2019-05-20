@@ -70,20 +70,5 @@ reset_wrappers()
 static void
 readLhInfoAddr()
 {
-  int mtcp_sys_errno;
-  int fd = mtcp_sys_open2(LH_FILE_NAME, O_RDONLY);
-  if (fd < 0) {
-    DLOG(ERROR, "Could not open addr.bin for reading. Error: %s",
-         strerror(mtcp_sys_errno));
-    exit(-1);
-  }
-
-  int rc = mtcp_sys_read(fd, &lhInfo, sizeof(lhInfo));
-  if (rc < sizeof(lhInfo)) {
-    DLOG(ERROR, "Read fewer bytes than expected from addr.bin. Error: %s",
-         strerror(mtcp_sys_errno));
-    exit(-1);
-  }
-  mtcp_sys_unlink(LH_FILE_NAME);
-  mtcp_sys_close(fd);
+  DLOG(INFO, "Upper half initialized");
 }

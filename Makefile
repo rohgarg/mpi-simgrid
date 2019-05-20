@@ -30,7 +30,7 @@ STATIC_TARGET_BIN_RANK1_LDFLAGS=-static -Wl,-Ttext-segment -Wl,0xF000000
 STATIC_TARGET_OBJS=${TARGET_OBJS} ${TARGET_PRELOAD_LIB_OBJS}
 
 run: ${KERNEL_LOADER_BIN} ${STATIC_TARGET_BIN_RANK0} ${STATIC_TARGET_BIN_RANK1} disableASLR
-	TARGET_EXE=${STATIC_TARGET_BIN} mpirun -n 2 ./$< arg1 arg2 arg3 &
+	TARGET_EXE=${STATIC_TARGET_BIN} mpirun -n 2 ./$< arg1 arg2 arg3
 
 run0: ${KERNEL_LOADER_BIN} ${STATIC_TARGET_BIN_RANK0} disableASLR
 	TARGET_EXE=${STATIC_TARGET_BIN} ./$< arg1 arg2 arg3
@@ -39,10 +39,10 @@ gdb: ${KERNEL_LOADER_BIN} ${STATIC_TARGET_BIN_RANK0}
 	TARGET_EXE=${STATIC_TARGET_BIN} gdb --args ./$< arg1 arg2 arg3
 
 restart0: ${KERNEL_LOADER_BIN} rank_0_ckpt.img
-	./$< --restore ./rank_0_ckpt.img
+	TARGET_EXE=${STATIC_TARGET_BIN} ./$< --restore ./rank_0_ckpt.img
 
 restart-simgrid: ${SIMGRID_BIN} ./rank_0_ckpt.img ./rank_1_ckpt.img
-	smpirun -gdb -np 2 -platform cluster_backbone.xml kernel-loader-dyn.exe --restore ./rank_0_ckpt.img ./rank_1_ckpt.img
+	TARGET_EXE=${STATIC_TARGET_BIN} smpirun -np 2 -platform cluster_backbone.xml kernel-loader-dyn.exe --restore ./rank_0_ckpt.img ./rank_1_ckpt.img
 
 disableASLR:
 	@- [ `cat /proc/sys/kernel/randomize_va_space` == 0 ] || sudo sh -c 'echo 0 > /proc/sys/kernel/randomize_va_space'

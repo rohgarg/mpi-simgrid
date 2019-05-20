@@ -121,7 +121,9 @@ extern LowerHalfInfo_t lhInfo;
 
 #define FOREACH_FNC(MACRO) \
     MACRO(Init) \
+    MACRO(Finalize) \
     MACRO(Comm_rank) \
+    MACRO(Comm_size) \
     MACRO(Send) \
     MACRO(Recv) \
 

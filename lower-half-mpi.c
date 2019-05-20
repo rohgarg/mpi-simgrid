@@ -14,7 +14,9 @@
 #include "lower-half-mpi.h"
 
 #undef __MPI_Init
+#undef __MPI_Finalize
 #undef __MPI_Comm_rank
+#undef __MPI_Comm_size
 #undef __MPI_Send
 #undef __MPI_Recv
 
@@ -27,6 +29,15 @@ __MPI_Init(int *argc, char ***argv)
   return MPI_SUCCESS;
 }
 
+int
+__MPI_Finalize()
+{
+  int retval;
+  DLOG(NOISE, "lower half mpi\n");
+  retval = MPI_Finalize();
+  return retval;
+}
+
 // DEFINE_FNC(int, Comm_rank, (MPI_Comm) comm, (int *) world_rank)
 int
 __MPI_Comm_rank(MPI_Comm comm, int *world_rank)
@@ -34,6 +45,16 @@ __MPI_Comm_rank(MPI_Comm comm, int *world_rank)
   int retval;
   DLOG(NOISE, "lower half mpi\n");
   retval = MPI_Comm_rank(virtual_to_real_comm(comm), world_rank);
+  return retval;
+}
+
+// DEFINE_FNC(int, Comm_size, (MPI_Comm) comm, (int *) world_size)
+int
+__MPI_Comm_size(MPI_Comm comm, int *world_size)
+{
+  int retval;
+  DLOG(NOISE, "lower half mpi\n");
+  retval = MPI_Comm_size(virtual_to_real_comm(comm), world_size);
   return retval;
 }
 

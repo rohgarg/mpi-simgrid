@@ -15,13 +15,19 @@
 #include "upper-half-mpi-wrappers.h"
 
 #undef MPI_Init
+#undef MPI_Finalize
 #undef MPI_Comm_rank
+#undef MPI_Comm_size
 #undef MPI_Send
 #undef MPI_Recv
 
 DEFINE_FNC(int, Init, (int *) argc, (char ***) argv)
 
-DEFINE_FNC(int, Comm_rank, (int) group, (int *) world_rank)
+DEFINE_FNC(int, Finalize, (void))
+
+DEFINE_FNC(int, Comm_rank, (MPI_Comm) comm, (int *) world_rank)
+
+DEFINE_FNC(int, Comm_size, (MPI_Comm) comm, (int *) size)
 
 DEFINE_FNC(int, Send, (const void *) buf, (int) count, (MPI_Datatype) datatype,
            (int) dest, (int) tag, (MPI_Comm) comm)

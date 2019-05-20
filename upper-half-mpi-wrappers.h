@@ -54,8 +54,14 @@
 extern int MPI_Init(int *argc, char ***argv) __attribute__((weak));
 #define MPI_Init(f, c) (MPI_Init ? MPI_Init(f, c) : 0)
 
+extern int MPI_Finalize() __attribute__((weak));
+#define MPI_Finalize() (MPI_Finalize ? MPI_Finalize() : 0)
+
 extern int MPI_Comm_rank(MPI_Comm comm, int *rank) __attribute__((weak));
 #define MPI_Comm_rank(f, g) (MPI_Comm_rank ? MPI_Comm_rank(f, g) : 0)
+
+extern int MPI_Comm_size(MPI_Comm comm, int *size) __attribute__((weak));
+#define MPI_Comm_size(f, g) (MPI_Comm_size ? MPI_Comm_size(f, g) : 0)
 
 extern int MPI_Send(const void *buf, int count,
                     MPI_Datatype datatype,

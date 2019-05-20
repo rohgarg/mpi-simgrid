@@ -38,7 +38,11 @@
 
 extern int __MPI_Init(int *argc, char ***argv);
 
+extern int __MPI_Finalize();
+
 extern int __MPI_Comm_rank(MPI_Comm comm, int *rank);
+
+extern int __MPI_Comm_size(MPI_Comm comm, int *size);
 
 extern int __MPI_Send(const void *buf, int count,
                     MPI_Datatype datatype,

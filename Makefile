@@ -6,7 +6,7 @@ RTLD_PATH=/lib64/ld-2.27.so
 MPI_INCLUDE_PATH=/usr/local/include
 
 FILE=kernel-loader
-KERNEL_LOADER_OBJS=${FILE}.o procmapsutils.o custom-loader.o mmap-wrapper.o sbrk-wrapper.o mpi-lh-if.o mem-restore.o utils.o trampoline_setup.o
+KERNEL_LOADER_OBJS=${FILE}.o procmapsutils.o custom-loader.o mmap-wrapper.o sbrk-wrapper.o mpi-lh-if.o mem-restore.o utils.o trampoline_setup.o lower-half-mpi.o
 TARGET_OBJS=target.o
 TARGET_PRELOAD_LIB_OBJS=upper-half-wrappers.o upper-half-mpi-wrappers.o mem-ckpt.o procmapsutils.o utils.o trampoline_setup.o
 
@@ -19,7 +19,7 @@ KERNEL_LOADER_BIN=kernel-loader.exe
 TARGET_BIN=t.exe
 TARGET_PRELOAD_LIB=libuhwrappers.so
 
-SIMGRID_OBJS=${FILE}-simgrid.o procmapsutils.o custom-loader.o mmap-wrapper.o sbrk-wrapper.o mpi-lh-if.o mem-restore.o utils.o trampoline_setup.o
+SIMGRID_OBJS=${FILE}-simgrid.o procmapsutils.o custom-loader.o mmap-wrapper.o sbrk-wrapper.o mpi-lh-if.o mem-restore.o utils.o trampoline_setup.o lower-half-mpi-simgrid.o
 SIMGRID_BIN=kernel-loader-dyn.exe
 
 STATIC_TARGET_BIN_RANK0=static-t-rank0.exe
@@ -64,6 +64,12 @@ ${FILE}.o: ${FILE}.c
 	${CC} ${CFLAGS} ${KERNEL_LOADER_CFLAGS} $< -o $@
 
 ${FILE}-simgrid.o: ${FILE}.c
+	smpicc ${CFLAGS_SIMGRID} ${KERNEL_LOADER_CFLAGS} $< -o $@
+
+lower-half-mpi.o: lower-half-mpi.c
+	${CC} ${CFLAGS} ${KERNEL_LOADER_CFLAGS} $< -o $@
+
+lower-half-mpi-simgrid.o: lower-half-mpi.c
 	smpicc ${CFLAGS_SIMGRID} ${KERNEL_LOADER_CFLAGS} $< -o $@
 
 ${TARGET_BIN}: ${TARGET_OBJS}

@@ -125,7 +125,7 @@ extern LowerHalfInfo_t lhInfo;
     MACRO(Recv) \
 
 #define GENERATE_ENUM_KL(ENUM) MPI_Fnc_##ENUM,
-#define GENERATE_FNC_PTR(FNC) &MPI_##FNC,
+#define GENERATE_FNC_PTR(FNC) &__MPI_##FNC,
 
 typedef enum __MPI_Fncs {
   MPI_Fnc_NULL,

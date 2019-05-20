@@ -5,6 +5,7 @@
 #include <mpi.h>
 
 #include "common.h"
+#include "lower-half-mpi.h"
 
 static void* MPI_Fnc_Ptrs[] = {
   NULL,

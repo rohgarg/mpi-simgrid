@@ -6,6 +6,9 @@
 #include "ckpt-restart.h"
 #include "upper-half-mpi-wrappers.h"
 
+#define _MPI_COMM_WORLD   1
+#define _MPI_INT   1
+
 static void processArgs(int, const char** );
 
 int
@@ -18,7 +21,7 @@ main(int argc, char **argv)
   int rank = -1;
   int rc = MPI_Init(&argc, &argv);
   printf("App: MPI_Init returned: %d\n", rc);
-  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  MPI_Comm_rank(_MPI_COMM_WORLD, &rank);
 
   while (i < 2) {
     printf("%d ", i);
@@ -35,10 +38,10 @@ main(int argc, char **argv)
     printf("App: Restarting from a ckpt...\n");
     int buf = 17;
     if (rank == 0) {
-      MPI_Send(&buf, 1, MPI_INT, 1, 0, MPI_COMM_WORLD);
+      MPI_Send(&buf, 1, _MPI_INT, 1, 0, _MPI_COMM_WORLD);
     } else if (rank == 1) {
       MPI_Status status;
-      MPI_Recv(&buf, 1, MPI_INT, 0, 0, MPI_COMM_WORLD, &status);
+      MPI_Recv(&buf, 1, _MPI_INT, 0, 0, _MPI_COMM_WORLD, &status);
     }
   }
 

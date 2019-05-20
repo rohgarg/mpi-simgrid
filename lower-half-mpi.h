@@ -28,25 +28,24 @@
 
 // Convenience macro to define simple wrapper functions
 #define DEFINE_FNC(rettype, name, args...)                                     \
-  rettype MPI_##name(APPLY(PAIR, args))                                        \
+  rettype __MPI_##name(APPLY(PAIR, args))                                      \
   {                                                                            \
-    DLOG(NOISE, "Simulating simgrid wrapper\n");                               \
     rettype retval;                                                            \
-    sleep(5);                                                                  \
-    retval = MPI_SUCCESS;                                                      \
+    DLOG(NOISE, "lower half mpi\n");                                           \
+    retval = MPI_##name(APPLY(STRIP, args));                                   \
     return retval;                                                             \
   }
 
-extern int MPI_Init(int *argc, char ***argv);
+extern int __MPI_Init(int *argc, char ***argv);
 
-extern int MPI_Comm_rank(MPI_Comm comm, int *rank);
+extern int __MPI_Comm_rank(MPI_Comm comm, int *rank);
 
-extern int MPI_Send(const void *buf, int count,
+extern int __MPI_Send(const void *buf, int count,
                     MPI_Datatype datatype,
                     int dest, int tag,
                     MPI_Comm comm);
 
-extern int MPI_Recv(void *buf, int count, MPI_Datatype datatype,
+extern int __MPI_Recv(void *buf, int count, MPI_Datatype datatype,
                     int source, int tag,
                     MPI_Comm comm, MPI_Status *status);
 

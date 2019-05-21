@@ -10,6 +10,7 @@
 
 #include <mpi.h>
 
+#include "ckpt-restart.h"
 #include "common.h"
 #include "lower-half-mpi.h"
 
@@ -19,6 +20,7 @@
 #undef __MPI_Comm_size
 #undef __MPI_Send
 #undef __MPI_Recv
+#undef __MPI_Exit
 
 static MPI_Comm virtual_to_real_comm(MPI_Comm );
 static MPI_Datatype virtual_to_real_type(MPI_Datatype );
@@ -82,6 +84,16 @@ __MPI_Recv(void *buf, int count, MPI_Datatype datatype,
   retval = MPI_Recv(buf, count, virtual_to_real_type(datatype),
                     source, tag, virtual_to_real_comm(comm), status);
   return retval;
+}
+
+int
+__MPI_Exit(int status)
+{
+  if (g_postRestart) {
+   // This never returns
+   setcontext(&g_context);
+  }
+  return 0;
 }
 
 

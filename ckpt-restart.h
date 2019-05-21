@@ -22,6 +22,9 @@ typedef enum __CkptOrRestore
   POST_RESTART,
 } CkptOrRestore_t;
 
+extern int g_postRestart;
+extern ucontext_t g_context;
+
 // Public API:
 //   Returns POST_RESUME, if resuming from a checkpoint,
 //   Returns POST_RESTORE, if restarting from a checkpoint

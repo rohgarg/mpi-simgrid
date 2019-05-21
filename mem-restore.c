@@ -19,10 +19,13 @@
 #include "procmapsutils.h"
 #include "utils.h"
 
+int g_postRestart = 0;
+ucontext_t g_context;
+
 static int restoreFs(void *fs);
 static int restoreMemory(int );
 static int restoreMemoryRegion(int , const Area* );
-static void* startRank(void* );
+static int startRank(void* );
 static int restoreMemoryForImage(const char* , CkptRestartState_t* );
 static int anyOverlappingRegion(const Area* );
 
@@ -30,6 +33,7 @@ int
 restoreCheckpoint(int rank, const char *ckptImg)
 {
   int rc = 0;
+  g_postRestart = 1;
 
   CkptRestartState_t *ctx = calloc(1, sizeof(CkptRestartState_t));
   rc = restoreMemoryForImage(ckptImg, ctx);
@@ -41,8 +45,7 @@ restoreCheckpoint(int rank, const char *ckptImg)
   char exeName[100] = {0};
   snprintf(exeName, 100, "%s-rank%d.exe", ldname, rank);
   patchLowerHalfInfo(exeName);
-  startRank((void*)ctx);
-  return rc;
+  return startRank((void*)ctx);
 }
 
 static int
@@ -67,15 +70,15 @@ restoreMemoryForImage(const char *ckptImg, CkptRestartState_t *st)
   return 0;
 }
 
-static void*
+static int
 startRank(void *arg)
 {
-  if (!arg) return NULL;
+  if (!arg) return -1;
   CkptRestartState_t *st = (CkptRestartState_t *)arg;
   restoreFs(st->fsAddr);
-  // This never returns
-  setcontext(&st->ctx);
-  return NULL;
+  // This returns at the end of the program
+  swapcontext(&g_context, &st->ctx);
+  return 0;
 }
 
 static int

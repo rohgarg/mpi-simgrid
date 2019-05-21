@@ -53,4 +53,6 @@ extern int __MPI_Recv(void *buf, int count, MPI_Datatype datatype,
                     int source, int tag,
                     MPI_Comm comm, MPI_Status *status);
 
+extern int __MPI_Exit(int status);
+
 #endif // ifndef LOWER_HALF_MPI_WRAPPERS_H

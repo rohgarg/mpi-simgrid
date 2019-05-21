@@ -51,6 +51,26 @@ mmap(void *addr, size_t length, int prot, int flags, int fd, off_t offset)
   return lowerHalfMmapWrapper(addr, length, prot, flags, fd, offset);
 }
 
+int exitWrapper(int status) __attribute__((destructor));
+
+int
+exitWrapper(int status)
+{
+  DLOG(SUPERNOISE, "In wrapper\n");
+  int retval;
+  if (!initialized) {
+    initialize_wrappers();
+  }
+  JUMP_TO_LOWER_HALF(lhInfo.lhFsAddr);
+  retval = ({__typeof__(&exitWrapper)_lh_exit = (__typeof__(&exitWrapper)) -1;
+  if (_lh_exit == (__typeof__(&exitWrapper)) -1) {
+    LhDlsym_t dlsymFptr = (LhDlsym_t)lhInfo.lhDlsym;
+    _lh_exit = (__typeof__(&exitWrapper))dlsymFptr(MPI_Fnc_Exit);
+  } _lh_exit; })(status);
+  RETURN_TO_UPPER_HALF();
+  return retval;
+}
+
 void
 initialize_wrappers()
 {

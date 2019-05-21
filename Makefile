@@ -41,6 +41,9 @@ gdb: ${KERNEL_LOADER_BIN} ${STATIC_TARGET_BIN_RANK0}
 restart0: ${KERNEL_LOADER_BIN} rank_0_ckpt.img
 	TARGET_EXE=${STATIC_TARGET_BIN} ./$< --restore ./rank_0_ckpt.img
 
+restart-simgrid0: ${SIMGRID_BIN} rank_0_ckpt.img
+	TARGET_EXE=${STATIC_TARGET_BIN} smpirun -gdb -np 1 -platform cluster_backbone.xml kernel-loader-dyn.exe --restore ./rank_0_ckpt.img
+
 restart-simgrid: ${SIMGRID_BIN} ./rank_0_ckpt.img ./rank_1_ckpt.img
 	TARGET_EXE=${STATIC_TARGET_BIN} smpirun -np 2 -platform cluster_backbone.xml kernel-loader-dyn.exe --restore ./rank_0_ckpt.img ./rank_1_ckpt.img
 

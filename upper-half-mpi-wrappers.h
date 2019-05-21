@@ -51,6 +51,12 @@
     return retval;                                                             \
   }
 
+#define _MPI_COMM_NULL    0
+#define _MPI_COMM_WORLD   1
+#define _MPI_COMM_SELF    2
+#define _MPI_BYTE   0
+#define _MPI_INT    1
+
 extern int MPI_Init(int *argc, char ***argv) __attribute__((weak));
 #define MPI_Init(f, c) (MPI_Init ? MPI_Init(f, c) : 0)
 

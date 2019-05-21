@@ -91,6 +91,7 @@ virtual_to_real_comm(MPI_Comm comm)
   switch ((uintptr_t)comm) {
     case 0:  return MPI_COMM_NULL; break;
     case 1:  return MPI_COMM_WORLD; break;
+    case 2:  return MPI_COMM_SELF; break;
     default: return (MPI_Comm)-1;
   }
 }
@@ -99,7 +100,11 @@ static MPI_Datatype
 virtual_to_real_type(MPI_Datatype type)
 {
   switch ((uintptr_t)type) {
+    case 0:  return MPI_BYTE; break;
     case 1:  return MPI_INT; break;
+    case 2:  return MPI_LONG; break;
+    case 3:  return MPI_FLOAT; break;
+    case 4:  return MPI_DOUBLE; break;
     default: return (MPI_Datatype)-1;
   }
 }
